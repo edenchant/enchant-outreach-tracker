@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Contact, Stage } from "@/lib/types";
 import HistoryPanel from "./HistoryPanel";
 
@@ -44,6 +45,14 @@ export default function ContactCard({
   segmentLabel?: string;
 }) {
   const tl = tierLetter(c.tier?.label);
+  const [emailCopied, setEmailCopied] = useState(false);
+
+  async function handleCopyEmail() {
+    if (!c.email) return;
+    await navigator.clipboard.writeText(c.email);
+    setEmailCopied(true);
+    setTimeout(() => setEmailCopied(false), 2000);
+  }
 
   return (
     <div className={`card status-${c.status}`}>
@@ -85,28 +94,32 @@ export default function ContactCard({
         </div>
       </div>
       <div className="actions">
-        {c.linkedin && (
-          <a href={c.linkedin} target="_blank" rel="noreferrer" title="Open LinkedIn">
-            in
-          </a>
-        )}
-        {c.email && (
-          <a href={`mailto:${c.email}`} title="Email">
-            ✉
-          </a>
-        )}
-        <button title="Draft a message" onClick={onDraft}>
-          ✨
-        </button>
-        <button title="Snooze 30 days" onClick={onSnooze}>
-          💤
-        </button>
-        <button title="Edit" onClick={onEdit}>
-          ✎
-        </button>
-        <button title="Delete" onClick={onDelete}>
-          ×
-        </button>
+        <div className="actions-grid">
+          <button title="Draft a message" onClick={onDraft}>
+            ✨
+          </button>
+          <button title={c.email ? (emailCopied ? "Copied!" : "Copy email address") : "No email on file"} disabled={!c.email} onClick={handleCopyEmail}>
+            {emailCopied ? "✓" : "✉"}
+          </button>
+          {c.linkedin ? (
+            <a href={c.linkedin} target="_blank" rel="noreferrer" title="Open LinkedIn">
+              in
+            </a>
+          ) : (
+            <span className="disabled" title="No LinkedIn on file">
+              in
+            </span>
+          )}
+          <button title="Snooze 30 days" onClick={onSnooze}>
+            💤
+          </button>
+          <button title="Edit" onClick={onEdit}>
+            ✎
+          </button>
+          <button title="Delete" onClick={onDelete}>
+            ×
+          </button>
+        </div>
         <button className="contacted" onClick={onMarkContacted}>
           Mark contacted
         </button>

@@ -410,11 +410,19 @@ select {
 
 .actions {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 30px);
   gap: 6px;
 }
 
-.actions a,
-.actions button {
+.actions-grid a,
+.actions-grid button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -429,12 +437,20 @@ select {
   font-size: 13px;
 }
 
+.actions-grid a.disabled,
+.actions-grid button:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
 .actions button.contacted {
   background: var(--accent-ink);
   border-color: var(--accent-ink);
   color: white;
   width: auto;
   padding: 0 10px;
+  height: 28px;
   font-size: 11.5px;
   font-family: var(--mono);
   white-space: nowrap;
