@@ -252,7 +252,7 @@ select {
   border-radius: 14px;
   padding: 13px 16px;
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto auto auto;
   gap: 14px;
   align-items: center;
   transition:
