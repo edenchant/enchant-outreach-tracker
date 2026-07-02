@@ -12,6 +12,7 @@ export default function DraftModal({ contact, onClose }: { contact: Contact; onC
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
 
   async function generate(k: "email" | "linkedin", contextOverride?: string) {
     setLoading(true);
@@ -49,9 +50,12 @@ export default function DraftModal({ contact, onClose }: { contact: Contact; onC
     setCopied(true);
   }
 
-  const mailtoHref = contact.email
-    ? `mailto:${contact.email}?subject=${encodeURIComponent(`Quick hello from Enchant`)}&body=${encodeURIComponent(draft)}`
-    : null;
+  async function handleCopyEmail() {
+    if (!contact.email) return;
+    await navigator.clipboard.writeText(contact.email);
+    setEmailCopied(true);
+    setTimeout(() => setEmailCopied(false), 2000);
+  }
 
   if (step === "context") {
     return (
@@ -131,10 +135,10 @@ export default function DraftModal({ contact, onClose }: { contact: Contact; onC
           <button className="btn" disabled={loading || !draft} onClick={handleCopy}>
             {copied ? "Copied!" : "Copy"}
           </button>
-          {kind === "email" && mailtoHref && (
-            <a className="btn primary" href={mailtoHref}>
-              Open in email
-            </a>
+          {kind === "email" && contact.email && (
+            <button className="btn primary" onClick={handleCopyEmail}>
+              {emailCopied ? "Email copied!" : "Copy email address"}
+            </button>
           )}
         </div>
       </div>
