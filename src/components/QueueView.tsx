@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Contact, Segment, Stage, Tier } from "@/lib/types";
 import {
-  deleteContact as apiDeleteContact,
   fetchContacts,
   fetchStats,
   fetchTopToday,
@@ -95,12 +94,6 @@ export default function QueueView({
   async function handleUndo(id: number) {
     await apiUndoContact(id);
     setToast(null);
-    await refresh();
-  }
-
-  async function handleDelete(id: number) {
-    if (!confirm("Delete this contact? This cannot be undone.")) return;
-    await apiDeleteContact(id);
     await refresh();
   }
 
@@ -198,7 +191,6 @@ export default function QueueView({
                     setModalMode("edit");
                     setEditingContact(c);
                   }}
-                  onDelete={() => handleDelete(c.id)}
                   onMarkContacted={() => handleMarkContacted(c.id, c.name)}
                   onSnooze={() => handleSnooze(c.id, c.name)}
                   onDraft={() => setDraftingContact(c)}
@@ -273,7 +265,6 @@ export default function QueueView({
               setModalMode("edit");
               setEditingContact(c);
             }}
-            onDelete={() => handleDelete(c.id)}
             onMarkContacted={() => handleMarkContacted(c.id, c.name)}
             onSnooze={() => handleSnooze(c.id, c.name)}
             onDraft={() => setDraftingContact(c)}

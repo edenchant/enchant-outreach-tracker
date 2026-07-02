@@ -19,6 +19,10 @@ function tierLetter(label?: string | null): string {
   return label.charAt(0);
 }
 
+function linkedinActivityUrl(linkedin: string): string {
+  return `${linkedin.replace(/\/+$/, "")}/recent-activity/all/`;
+}
+
 // Purely a visual read of list position, like a signal meter — not a
 // re-statement of the priority score itself. Ranks 1-2 read as "hot"
 // (all 5 bars lit), tapering down every couple of places.
@@ -33,7 +37,6 @@ export default function ContactCard({
   expanded,
   onToggleExpand,
   onEdit,
-  onDelete,
   onMarkContacted,
   onDraft,
   onSnooze,
@@ -45,7 +48,6 @@ export default function ContactCard({
   expanded: boolean;
   onToggleExpand: () => void;
   onEdit: () => void;
-  onDelete: () => void;
   onMarkContacted: () => void;
   onDraft: () => void;
   onSnooze: () => void;
@@ -113,7 +115,12 @@ export default function ContactCard({
           <button title="Draft a message" onClick={onDraft}>
             ✨
           </button>
-          <button title={c.email ? (emailCopied ? "Copied!" : "Copy email address") : "No email on file"} disabled={!c.email} onClick={handleCopyEmail}>
+          <button
+            className={c.email ? "" : "missing"}
+            title={c.email ? (emailCopied ? "Copied!" : "Copy email address") : "No email on file"}
+            disabled={!c.email}
+            onClick={handleCopyEmail}
+          >
             {emailCopied ? "✓" : "✉"}
           </button>
           {c.linkedin ? (
@@ -121,7 +128,7 @@ export default function ContactCard({
               in
             </a>
           ) : (
-            <span className="disabled" title="No LinkedIn on file">
+            <span className="missing" title="No LinkedIn on file">
               in
             </span>
           )}
@@ -131,9 +138,15 @@ export default function ContactCard({
           <button title="Edit" onClick={onEdit}>
             ✎
           </button>
-          <button title="Delete" onClick={onDelete}>
-            ×
-          </button>
+          {c.linkedin ? (
+            <a href={linkedinActivityUrl(c.linkedin)} target="_blank" rel="noreferrer" title="Recent LinkedIn activity">
+              📈
+            </a>
+          ) : (
+            <span className="missing" title="No LinkedIn on file">
+              📈
+            </span>
+          )}
         </div>
         <button className="contacted" onClick={onMarkContacted}>
           Mark contacted

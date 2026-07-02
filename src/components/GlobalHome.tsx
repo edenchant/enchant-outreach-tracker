@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Contact, GridContact, Segment, Stage, Tier } from "@/lib/types";
 import {
-  deleteContact as apiDeleteContact,
   fetchGlobalStats,
   fetchGlobalTopToday,
   fetchSegmentConfig,
@@ -72,12 +71,6 @@ export default function GlobalHome({
   async function handleUndo(id: number) {
     await apiUndoContact(id);
     setToast(null);
-    await refresh();
-  }
-
-  async function handleDelete(id: number) {
-    if (!confirm("Delete this contact? This cannot be undone.")) return;
-    await apiDeleteContact(id);
     await refresh();
   }
 
@@ -175,7 +168,6 @@ export default function GlobalHome({
               expanded={expandedId === c.id}
               onToggleExpand={() => handleToggleExpand(c)}
               onEdit={() => handleEdit(c)}
-              onDelete={() => handleDelete(c.id)}
               onMarkContacted={() => handleMarkContacted(c.id, c.name)}
               onSnooze={() => handleSnooze(c.id, c.name)}
               onDraft={() => setDraftingContact(c)}

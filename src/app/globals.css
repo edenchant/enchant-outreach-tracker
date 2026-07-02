@@ -552,7 +552,8 @@ select {
 }
 
 .actions-grid a,
-.actions-grid button {
+.actions-grid button,
+.actions-grid span {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -567,9 +568,10 @@ select {
   font-size: 13px;
 }
 
-.actions-grid a.disabled,
-.actions-grid button:disabled {
-  opacity: 0.35;
+.actions-grid .missing {
+  background: var(--overdue-soft);
+  border-color: var(--overdue);
+  color: var(--overdue);
   cursor: default;
   pointer-events: none;
 }
