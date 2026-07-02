@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Waveform from "./Waveform";
 import type { Segment, Stage, Tier } from "@/lib/types";
 import { updateStageApi, updateTierApi } from "@/lib/api-client";
 
@@ -50,6 +51,7 @@ export default function SettingsForm({
             ← Back to queue
           </Link>
         </div>
+        <Waveform />
       </header>
 
       <div className="settings-section">

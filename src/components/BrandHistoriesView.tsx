@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import Waveform from "./Waveform";
 import type { BrandHistoryEntry } from "@/lib/types";
 import {
   confirmBrandHistory,
@@ -114,6 +115,7 @@ export default function BrandHistoriesView({
             ← Back to queue
           </Link>
         </div>
+        <Waveform />
       </header>
 
       <div className="brand-history-panel">

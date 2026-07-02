@@ -13,6 +13,8 @@ import {
   undoContact as apiUndoContact,
 } from "@/lib/api-client";
 import SegmentTabs from "./SegmentTabs";
+import Waveform from "./Waveform";
+import StatMeter from "./StatMeter";
 import ContactCard from "./ContactCard";
 import ContactFormModal from "./ContactFormModal";
 import DraftModal from "./DraftModal";
@@ -113,6 +115,7 @@ export default function GlobalHome({
             {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </div>
         </div>
+        <Waveform />
       </header>
 
       {toast && (
@@ -136,18 +139,22 @@ export default function GlobalHome({
         <div className="stat overdue">
           <div className="num">{stats.overdue}</div>
           <div className="label">Overdue</div>
+          <StatMeter value={stats.overdue} total={stats.total} />
         </div>
         <div className="stat today">
           <div className="num">{stats.today}</div>
           <div className="label">Due today</div>
+          <StatMeter value={stats.today} total={stats.total} />
         </div>
         <div className="stat upcoming">
           <div className="num">{stats.upcoming}</div>
           <div className="label">Upcoming (7d)</div>
+          <StatMeter value={stats.upcoming} total={stats.total} />
         </div>
-        <div className="stat">
+        <div className="stat total">
           <div className="num">{stats.total}</div>
           <div className="label">Total contacts</div>
+          <StatMeter value={stats.total} total={stats.total} />
         </div>
       </div>
 

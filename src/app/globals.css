@@ -1,20 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #e9f2fb;
+  --bg: #fbf1ee;
   --panel: #ffffff;
-  --ink: #122436;
-  --ink-soft: #4d6a86;
-  --line: #c9dcf0;
-  --accent: #2a78d6;
-  --accent-ink: #1c5cab;
-  --accent-soft: #dbeafc;
-  --overdue: #d03b3b;
-  --overdue-soft: #fbe6e6;
+  --ink: #2a1210;
+  --ink-soft: #8a5f5a;
+  --line: #edd6d0;
+  --accent: #a63a52;
+  --accent-ink: #7a1220;
+  --accent-soft: #f8dfda;
+  --signal: #ef3d2e;
+  --signal-soft: #fde0da;
+  --ember: #ff8a3d;
+  --overdue: #c81e3d;
+  --overdue-soft: #fbe1e1;
   --due-today: #c9860a;
   --due-today-soft: #fdf0d9;
-  --upcoming: #2a78d6;
-  --upcoming-soft: #dbeafc;
+  --upcoming: #a34568;
+  --upcoming-soft: #f3dde6;
   --tier-s: #4a3aa7;
   --tier-s-soft: #e8e5f7;
   --tier-a: #9c6208;
@@ -26,7 +29,8 @@
   --tier-d: #5c6f80;
   --tier-d-soft: #e6edf3;
   --mono: var(--font-jetbrains-mono), "SF Mono", Consolas, monospace;
-  --sans: var(--font-nunito), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sans: var(--font-work-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --display: var(--font-bricolage), var(--font-work-sans), -apple-system, sans-serif;
 }
 
 * {
@@ -53,36 +57,92 @@ a {
 }
 
 header.top {
+  position: relative;
+  overflow: hidden;
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 18px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 18px;
+  align-items: flex-start;
+  margin-bottom: 22px;
+  background: var(--accent-ink);
+  border-radius: 20px;
+  padding: 24px 26px 34px;
   gap: 16px;
   flex-wrap: wrap;
 }
 
+header.top::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 34px);
+  pointer-events: none;
+}
+
+.waveform {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  padding: 0 26px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.waveform span {
+  flex: 1 0 auto;
+  width: 3px;
+  background: linear-gradient(180deg, var(--ember), var(--signal) 60%, var(--accent) 140%);
+  border-radius: 2px 2px 0 0;
+  opacity: 0.75;
+}
+
+.waveform span:nth-child(3n + 1) {
+  background: linear-gradient(180deg, var(--signal), var(--accent-ink) 140%);
+  opacity: 0.5;
+}
+
 .eyebrow {
+  position: relative;
   font-family: var(--mono);
   font-size: 11px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ink-soft);
-  margin: 0 0 4px;
+  color: var(--signal);
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 0 4px rgba(239, 61, 46, 0.25);
 }
 
 h1 {
-  font-size: 26px;
+  position: relative;
+  font-family: var(--display);
+  font-size: 28px;
   margin: 0;
   letter-spacing: -0.01em;
-  font-weight: 650;
+  font-weight: 700;
+  color: #fff;
+  text-wrap: balance;
 }
 
 .today-date {
+  position: relative;
   font-family: var(--mono);
-  font-size: 13px;
-  color: var(--ink-soft);
+  font-size: 12.5px;
+  color: #f0c3c1;
   text-align: right;
 }
 
@@ -130,12 +190,14 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 14px 16px;
+  box-shadow: 0 1px 2px rgba(42, 18, 16, 0.04), 0 10px 24px -18px rgba(42, 18, 16, 0.35);
 }
 
 .stat .num {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -157,6 +219,50 @@ h1 {
 
 .stat.upcoming .num {
   color: var(--upcoming);
+}
+
+.meter {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 14px;
+  margin-top: 10px;
+}
+
+.meter span {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  background: var(--line);
+  height: 35%;
+}
+
+.meter span:nth-child(2n) {
+  height: 60%;
+}
+
+.meter span:nth-child(3n) {
+  height: 85%;
+}
+
+.meter span:nth-child(5n) {
+  height: 100%;
+}
+
+.stat.overdue .meter span.lit {
+  background: var(--overdue);
+}
+
+.stat.today .meter span.lit {
+  background: var(--due-today);
+}
+
+.stat.upcoming .meter span.lit {
+  background: var(--upcoming);
+}
+
+.stat.total .meter span {
+  background: var(--ink-soft);
+  opacity: 0.4;
 }
 
 .controls {
@@ -280,12 +386,36 @@ select {
   opacity: 0.35;
 }
 
-.rank {
+.rank-meter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 24px;
+}
+
+.rank-meter .bars {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+}
+
+.rank-meter .bars span {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.rank-meter .bars span.lit {
+  background: var(--signal);
+}
+
+.rank-meter .rank-num {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 10.5px;
   color: var(--ink-soft);
-  width: 22px;
-  text-align: right;
+  font-weight: 600;
 }
 
 .who .name-line {
@@ -296,14 +426,14 @@ select {
 }
 
 .who .name {
-  font-weight: 650;
-  font-size: 14.5px;
+  font-weight: 700;
+  font-size: 15px;
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
   color: inherit;
-  font-family: inherit;
+  font-family: var(--display);
   text-align: left;
 }
 
@@ -490,8 +620,9 @@ select {
 
 .top-ten-header h2 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 800;
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
   display: flex;
   align-items: baseline;
   gap: 10px;

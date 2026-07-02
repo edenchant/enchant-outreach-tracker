@@ -19,6 +19,13 @@ function tierLetter(label?: string | null): string {
   return label.charAt(0);
 }
 
+// Purely a visual read of list position, like a signal meter — not a
+// re-statement of the priority score itself. Ranks 1-2 read as "hot"
+// (all 5 bars lit), tapering down every couple of places.
+function signalLevel(rank: number): number {
+  return Math.max(1, Math.min(5, 6 - Math.ceil(rank / 2)));
+}
+
 export default function ContactCard({
   contact: c,
   rank,
@@ -45,6 +52,7 @@ export default function ContactCard({
   segmentLabel?: string;
 }) {
   const tl = tierLetter(c.tier?.label);
+  const level = signalLevel(rank);
   const [emailCopied, setEmailCopied] = useState(false);
 
   async function handleCopyEmail() {
@@ -56,7 +64,14 @@ export default function ContactCard({
 
   return (
     <div className={`card status-${c.status}`}>
-      <div className="rank">{rank}</div>
+      <div className="rank-meter" aria-hidden="true">
+        <div className="bars">
+          {[1, 2, 3, 4, 5].map((bar) => (
+            <span key={bar} className={bar <= level ? "lit" : ""} />
+          ))}
+        </div>
+        <div className="rank-num">{rank}</div>
+      </div>
       <div className="who">
         <div className="name-line">
           <button className="name" onClick={onToggleExpand}>

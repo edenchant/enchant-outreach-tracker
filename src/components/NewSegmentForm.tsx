@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Segment } from "@/lib/types";
 import { createSegment } from "@/lib/api-client";
 import SegmentTabs from "./SegmentTabs";
+import Waveform from "./Waveform";
 
 export default function NewSegmentForm({ existingSegments }: { existingSegments: Segment[] }) {
   const [name, setName] = useState("");
@@ -38,6 +39,7 @@ export default function NewSegmentForm({ existingSegments }: { existingSegments:
           <p className="eyebrow">Enchant · outreach tracker</p>
           <h1>New segment</h1>
         </div>
+        <Waveform />
       </header>
       <div className="modal" style={{ maxWidth: 480 }}>
         <form onSubmit={handleSubmit}>

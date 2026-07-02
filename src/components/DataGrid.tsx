@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Waveform from "./Waveform";
 import type { GridContact } from "@/lib/types";
 import type { ContactPayload } from "@/lib/api-client";
 import type { Segment, Stage, Tier } from "@/lib/types";
@@ -130,6 +131,7 @@ export default function DataGrid({
             Brand histories
           </Link>
         </div>
+        <Waveform />
       </header>
 
       <div className="controls">
