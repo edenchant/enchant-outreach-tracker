@@ -33,6 +33,7 @@ export default function DataGrid({
   const [sortBy, setSortBy] = useState("priority");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [configCache, setConfigCache] = useState<Record<string, { tiers: Tier[]; stages: Stage[] }>>({});
+  const [editMode, setEditMode] = useState(false);
   const [pendingSaves, setPendingSaves] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,6 +171,9 @@ export default function DataGrid({
           ))}
         </select>
         <div className="grid-count">{total.toLocaleString()} contacts</div>
+        <button className={`btn ${editMode ? "primary" : ""}`} onClick={() => setEditMode((v) => !v)}>
+          {editMode ? "Editing — click to lock" : "Enable editing"}
+        </button>
         {pendingSaves > 0 && <div className="saving-indicator">Saving…</div>}
       </div>
 
@@ -220,84 +224,112 @@ export default function DataGrid({
                 <tr key={rowKey}>
                   <td>{row.segmentName}</td>
                   <td>
-                    <select
-                      defaultValue={row.tierId ? String(row.tierId) : ""}
-                      disabled={!cfg}
-                      onChange={(e) => saveField(row, { tierId: e.target.value ? Number(e.target.value) : null })}
-                    >
-                      <option value="">—</option>
-                      {(cfg?.tiers ?? []).map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
+                    {editMode ? (
+                      <select
+                        defaultValue={row.tierId ? String(row.tierId) : ""}
+                        disabled={!cfg}
+                        onChange={(e) => saveField(row, { tierId: e.target.value ? Number(e.target.value) : null })}
+                      >
+                        <option value="">—</option>
+                        {(cfg?.tiers ?? []).map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      row.tier?.label ?? "—"
+                    )}
                   </td>
                   <td>
-                    <input
-                      defaultValue={row.brand ?? ""}
-                      onBlur={(e) => {
-                        const val = e.target.value.trim() || null;
-                        if (val !== (row.brand ?? null)) saveField(row, { brand: val });
-                      }}
-                    />
+                    {editMode ? (
+                      <input
+                        defaultValue={row.brand ?? ""}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim() || null;
+                          if (val !== (row.brand ?? null)) saveField(row, { brand: val });
+                        }}
+                      />
+                    ) : (
+                      row.brand ?? ""
+                    )}
                   </td>
                   <td>
-                    <input
-                      defaultValue={row.subBrand ?? ""}
-                      onBlur={(e) => {
-                        const val = e.target.value.trim() || null;
-                        if (val !== (row.subBrand ?? null)) saveField(row, { subBrand: val });
-                      }}
-                    />
+                    {editMode ? (
+                      <input
+                        defaultValue={row.subBrand ?? ""}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim() || null;
+                          if (val !== (row.subBrand ?? null)) saveField(row, { subBrand: val });
+                        }}
+                      />
+                    ) : (
+                      row.subBrand ?? ""
+                    )}
                   </td>
                   <td>
-                    <input
-                      defaultValue={row.name}
-                      onBlur={(e) => {
-                        const val = e.target.value.trim();
-                        if (!val) {
-                          e.target.value = row.name;
-                          return;
-                        }
-                        if (val !== row.name) saveField(row, { name: val });
-                      }}
-                    />
+                    {editMode ? (
+                      <input
+                        defaultValue={row.name}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          if (!val) {
+                            e.target.value = row.name;
+                            return;
+                          }
+                          if (val !== row.name) saveField(row, { name: val });
+                        }}
+                      />
+                    ) : (
+                      row.name
+                    )}
                   </td>
                   <td>
-                    <input
-                      defaultValue={row.role ?? ""}
-                      onBlur={(e) => {
-                        const val = e.target.value.trim() || null;
-                        if (val !== (row.role ?? null)) saveField(row, { role: val });
-                      }}
-                    />
+                    {editMode ? (
+                      <input
+                        defaultValue={row.role ?? ""}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim() || null;
+                          if (val !== (row.role ?? null)) saveField(row, { role: val });
+                        }}
+                      />
+                    ) : (
+                      row.role ?? ""
+                    )}
                   </td>
                   <td>
-                    <input
-                      type="number"
-                      min="0"
-                      defaultValue={row.followers != null ? String(row.followers) : ""}
-                      onBlur={(e) => {
-                        const raw = e.target.value.trim();
-                        const val = raw ? Number(raw) : null;
-                        if (val !== row.followers) saveField(row, { followers: val });
-                      }}
-                    />
+                    {editMode ? (
+                      <input
+                        type="number"
+                        min="0"
+                        defaultValue={row.followers != null ? String(row.followers) : ""}
+                        onBlur={(e) => {
+                          const raw = e.target.value.trim();
+                          const val = raw ? Number(raw) : null;
+                          if (val !== row.followers) saveField(row, { followers: val });
+                        }}
+                      />
+                    ) : (
+                      row.followers?.toLocaleString() ?? ""
+                    )}
                   </td>
                   <td>
-                    <select
-                      defaultValue={row.stageId ? String(row.stageId) : ""}
-                      disabled={!cfg}
-                      onChange={(e) => saveField(row, { stageId: e.target.value ? Number(e.target.value) : null })}
-                    >
-                      <option value="">—</option>
-                      {(cfg?.stages ?? []).map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
+                    {editMode ? (
+                      <select
+                        defaultValue={row.stageId ? String(row.stageId) : ""}
+                        disabled={!cfg}
+                        onChange={(e) => saveField(row, { stageId: e.target.value ? Number(e.target.value) : null })}
+                      >
+                        <option value="">—</option>
+                        {(cfg?.stages ?? []).map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      row.stage?.name ?? "—"
+                    )}
                   </td>
                   <td>{row.dueAt ? new Date(row.dueAt).toLocaleDateString("en-GB") : "—"}</td>
                   <td title={row.brandBonus ? `Boosted from base ${row.priorityScore.toFixed(1)} — ${row.brandBonus.eventType}, ${row.brandBonus.daysAgo}d ago` : undefined}>
@@ -305,27 +337,41 @@ export default function DataGrid({
                     {row.brandBonus ? " 📰" : ""}
                   </td>
                   <td>
-                    <input
-                      defaultValue={row.email ?? ""}
-                      onBlur={(e) => {
-                        const val = e.target.value.trim() || null;
-                        if (val !== (row.email ?? null)) saveField(row, { email: val });
-                      }}
-                    />
+                    {editMode ? (
+                      <input
+                        defaultValue={row.email ?? ""}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim() || null;
+                          if (val !== (row.email ?? null)) saveField(row, { email: val });
+                        }}
+                      />
+                    ) : (
+                      row.email ?? ""
+                    )}
                   </td>
                   <td>
-                    <input
-                      defaultValue={row.linkedin ?? ""}
-                      onBlur={(e) => {
-                        const val = e.target.value.trim() || null;
-                        if (val !== (row.linkedin ?? null)) saveField(row, { linkedin: val });
-                      }}
-                    />
+                    {editMode ? (
+                      <input
+                        defaultValue={row.linkedin ?? ""}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim() || null;
+                          if (val !== (row.linkedin ?? null)) saveField(row, { linkedin: val });
+                        }}
+                      />
+                    ) : row.linkedin ? (
+                      <a href={row.linkedin} target="_blank" rel="noreferrer">
+                        in
+                      </a>
+                    ) : (
+                      ""
+                    )}
                   </td>
                   <td className="data-grid-actions">
-                    <button className="btn" onClick={() => handleDelete(row.id)}>
-                      Delete
-                    </button>
+                    {editMode && (
+                      <button className="btn" onClick={() => handleDelete(row.id)}>
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               );
