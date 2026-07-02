@@ -122,14 +122,22 @@ export default function BrandHistoriesView({
             {showForm ? "Cancel" : "+ Add entry"}
           </button>
           <button className="btn" disabled={scanning} onClick={handleScan}>
-            {scanning ? "Scanning…" : "Scan for brand news now"}
+            {scanning ? "Scanning (~a few minutes)…" : "Spot-check 10 brands now"}
           </button>
           <span className="last-scanned">
             Last scanned: {fmtDateTime(summary.lastRunAt)}
             {typeof summary.newEntries === "number" ? ` · ${summary.newEntries} new entr${summary.newEntries === 1 ? "y" : "ies"} found` : ""}
-            {typeof summary.brandsScanned === "number" ? ` · ${summary.brandsScanned} brands checked` : ""}
+            {typeof summary.brandsScanned === "number" && typeof summary.totalBrands === "number"
+              ? ` · ${summary.brandsScanned} of ${summary.totalBrands} brands checked this run`
+              : ""}
             {summary.ok === false && summary.error ? ` · scan failed: ${summary.error}` : ""}
           </span>
+        </div>
+        <div className="last-scanned" style={{ marginBottom: 14 }}>
+          The full brand list is large (
+          {summary.totalBrands ?? "600+"} brands), so a daily background scan works through it in rotating batches —
+          each brand gets checked every few days, not necessarily every day. The button above checks a small batch
+          immediately as a quick spot-check; it advances the same rotation.
         </div>
         {scanError && <div className="error-text">{scanError}</div>}
         {summary.errors && summary.errors.length > 0 && (

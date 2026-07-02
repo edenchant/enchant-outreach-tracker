@@ -232,6 +232,7 @@ export async function dismissBrandHistory(id: number): Promise<void> {
 export interface ScanSummaryDTO {
   lastRunAt: string | null;
   brandsScanned?: number;
+  totalBrands?: number;
   newEntries?: number;
   errors?: string[];
   error?: string;
@@ -244,8 +245,8 @@ export async function fetchScanSummary(): Promise<ScanSummaryDTO> {
   return data.summary;
 }
 
-export async function triggerBrandScan(): Promise<{ brandsScanned: number; newEntries: number; errors: string[] }> {
+export async function triggerBrandScan(): Promise<{ brandsScanned: number; totalBrands: number; newEntries: number; errors: string[] }> {
   const res = await fetch(`/api/brand-histories/scan`, { method: "POST" });
-  const data = await json<{ result: { brandsScanned: number; newEntries: number; errors: string[] } }>(res);
+  const data = await json<{ result: { brandsScanned: number; totalBrands: number; newEntries: number; errors: string[] } }>(res);
   return data.result;
 }

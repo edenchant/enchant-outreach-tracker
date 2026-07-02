@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { createBrandHistoryEntry, findRecentSimilarBrandEvent, listDistinctBrands } from "./queries";
+import { createBrandHistoryEntry, findRecentSimilarBrandEvent, getSetting, listDistinctBrands, setSetting } from "./queries";
 
 const EVENT_TYPES = ["New CMO", "Brand Refresh / Rebrand", "Major ATL Campaign"] as const;
 type EventType = (typeof EVENT_TYPES)[number];
@@ -7,6 +7,42 @@ type EventType = (typeof EVENT_TYPES)[number];
 // Same underlying story covered by several outlets in one week should
 // produce one Brand Histories entry, not five.
 const DEDUP_WINDOW_DAYS = 21;
+
+// NewsData.io's free tier caps out at 200 requests/day AND throttles to
+// 30 requests per 15 minutes (~1 every 30s) — with 600+ distinct brands in
+// this dataset, one request per brand per day isn't possible on this plan.
+// Instead we pace requests safely under that throttle and only scan a
+// rotating slice of the brand list each run (see nextBrandBatch below), so
+// every brand gets checked every few days rather than daily, for free.
+export const MIN_REQUEST_INTERVAL_MS = 34_000;
+export const DAILY_SCAN_BATCH_SIZE = 180; // safely under the 200/day cap
+export const MANUAL_SCAN_BATCH_SIZE = 10; // small enough to wait on (~6 min)
+
+const CURSOR_KEY = "brand_scan_cursor";
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Picks the next `batchSize` brands starting where the last run (manual or
+// scheduled) left off, wrapping around the full alphabetical list. The
+// cursor only advances once a batch has actually been scanned.
+function nextBrandBatch(batchSize: number): { batch: string[]; allBrands: string[] } {
+  const allBrands = listDistinctBrands();
+  if (allBrands.length === 0) return { batch: [], allBrands };
+  const cursorRaw = getSetting(CURSOR_KEY);
+  const cursor = cursorRaw ? Number(cursorRaw) % allBrands.length : 0;
+  const size = Math.min(batchSize, allBrands.length);
+  const batch = Array.from({ length: size }, (_, i) => allBrands[(cursor + i) % allBrands.length]);
+  return { batch, allBrands };
+}
+
+function advanceCursor(count: number, totalBrands: number) {
+  if (totalBrands === 0) return;
+  const cursorRaw = getSetting(CURSOR_KEY);
+  const cursor = cursorRaw ? Number(cursorRaw) % totalBrands : 0;
+  setSetting(CURSOR_KEY, String((cursor + count) % totalBrands));
+}
 
 interface NewsHeadline {
   title: string;
@@ -94,52 +130,59 @@ Use eventType: null and relevant: false for anything that doesn't clearly match 
 
 export interface ScanResult {
   brandsScanned: number;
+  totalBrands: number;
   newEntries: number;
   errors: string[];
 }
 
-export async function scanBrandNews(): Promise<ScanResult> {
+export async function scanBrandNews(batchSize: number): Promise<ScanResult> {
   const newsApiKey = process.env.NEWSDATA_API_KEY;
   if (!newsApiKey) {
     throw new Error("NEWSDATA_API_KEY is not configured on this deployment.");
   }
 
-  const brands = listDistinctBrands();
+  const { batch, allBrands } = nextBrandBatch(batchSize);
   const errors: string[] = [];
   let newEntries = 0;
 
   const sinceDate = new Date(Date.now() - DEDUP_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const today = new Date().toISOString().slice(0, 10);
 
-  for (const brand of brands) {
+  for (let i = 0; i < batch.length; i++) {
+    const brand = batch[i];
     try {
       const headlines = await fetchNewsForBrand(brand, newsApiKey);
-      if (headlines.length === 0) continue;
+      if (headlines.length > 0) {
+        const classifications = await classifyHeadlines(brand, headlines);
+        for (const c of classifications) {
+          if (!c.relevant || !c.eventType) continue;
+          const headline = headlines[c.index];
+          if (!headline) continue;
 
-      const classifications = await classifyHeadlines(brand, headlines);
-      for (const c of classifications) {
-        if (!c.relevant || !c.eventType) continue;
-        const headline = headlines[c.index];
-        if (!headline) continue;
+          const existing = findRecentSimilarBrandEvent(brand, c.eventType, sinceDate);
+          if (existing) continue;
 
-        const existing = findRecentSimilarBrandEvent(brand, c.eventType, sinceDate);
-        if (existing) continue;
-
-        createBrandHistoryEntry({
-          brand,
-          eventType: c.eventType,
-          date: today,
-          note: headline.title,
-          source: "news_api",
-          articleUrl: headline.url,
-          status: "pending",
-        });
-        newEntries++;
+          createBrandHistoryEntry({
+            brand,
+            eventType: c.eventType,
+            date: today,
+            note: headline.title,
+            source: "news_api",
+            articleUrl: headline.url,
+            status: "pending",
+          });
+          newEntries++;
+        }
       }
     } catch (e) {
       errors.push(`${brand}: ${(e as Error).message}`);
     }
+
+    // Stay comfortably under NewsData.io's 30-requests-per-15-minutes throttle.
+    if (i < batch.length - 1) await sleep(MIN_REQUEST_INTERVAL_MS);
   }
 
-  return { brandsScanned: brands.length, newEntries, errors };
+  advanceCursor(batch.length, allBrands.length);
+
+  return { brandsScanned: batch.length, totalBrands: allBrands.length, newEntries, errors };
 }

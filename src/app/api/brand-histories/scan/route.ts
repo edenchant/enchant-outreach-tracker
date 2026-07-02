@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MANUAL_SCAN_BATCH_SIZE } from "@/lib/brand-news";
 import { getLastScanSummary, runScanNow } from "@/lib/scheduler";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export async function POST() {
     );
   }
   try {
-    const result = await runScanNow();
+    const result = await runScanNow(MANUAL_SCAN_BATCH_SIZE, "manual");
     return NextResponse.json({ result });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
