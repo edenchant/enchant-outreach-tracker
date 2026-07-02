@@ -19,3 +19,15 @@ export function classify(dueAt: string | null, now: Date): QueueStatus {
   if (diffDays < 1) return "today";
   return "upcoming";
 }
+
+// A brand history entry (new CMO / rebrand / major campaign) gives a modest,
+// time-limited boost to that brand's contacts. This only affects sort order
+// at read time — the stored priority_score is never touched by it.
+export const BRAND_HISTORY_RECENCY_DAYS = 60;
+export const BRAND_HISTORY_MAX_BONUS = 0.15;
+
+export function brandBonusMultiplier(daysSinceEvent: number | null): number {
+  if (daysSinceEvent === null || daysSinceEvent < 0 || daysSinceEvent > BRAND_HISTORY_RECENCY_DAYS) return 1;
+  const decay = 1 - daysSinceEvent / BRAND_HISTORY_RECENCY_DAYS;
+  return 1 + BRAND_HISTORY_MAX_BONUS * decay;
+}

@@ -39,13 +39,36 @@ export interface Contact {
   lastContactedAt: string | null;
   dueAt: string | null;
   priorityScore: number;
+  effectivePriorityScore: number;
   promptContext: string | null;
+  hasReplied: boolean;
+  lastReplyAt: string | null;
+  lastReplySubject: string | null;
   archived: boolean;
   createdAt: string;
   updatedAt: string;
   tier?: Tier | null;
   stage?: Stage | null;
   status: "overdue" | "today" | "upcoming" | "none";
+  brandBonus?: BrandBonusInfo | null;
+}
+
+export interface BrandBonusInfo {
+  eventType: string;
+  date: string;
+  daysAgo: number;
+}
+
+export interface BrandHistoryEntry {
+  id: number;
+  brand: string;
+  eventType: "New CMO" | "Brand Refresh / Rebrand" | "Major ATL Campaign";
+  date: string;
+  note: string | null;
+  source: "manual" | "news_api";
+  articleUrl: string | null;
+  status: "confirmed" | "pending";
+  createdAt: string;
 }
 
 export interface GridContact extends Contact {

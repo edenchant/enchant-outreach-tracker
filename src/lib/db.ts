@@ -70,10 +70,29 @@ CREATE TABLE IF NOT EXISTS outreach_events (
   contacted_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS brand_histories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  brand TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  date TEXT NOT NULL,
+  note TEXT,
+  source TEXT NOT NULL DEFAULT 'manual',
+  article_url TEXT,
+  status TEXT NOT NULL DEFAULT 'confirmed',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_contacts_segment ON contacts(segment_id);
 CREATE INDEX IF NOT EXISTS idx_contacts_due ON contacts(due_at);
 CREATE INDEX IF NOT EXISTS idx_contacts_priority ON contacts(priority_score);
 CREATE INDEX IF NOT EXISTS idx_events_contact ON outreach_events(contact_id);
+CREATE INDEX IF NOT EXISTS idx_brand_histories_brand ON brand_histories(brand);
+CREATE INDEX IF NOT EXISTS idx_brand_histories_date ON brand_histories(date);
 `;
 
 function migrate(db: DatabaseSync) {
@@ -81,6 +100,18 @@ function migrate(db: DatabaseSync) {
   const hasPromptContext = contactColumns.some((c) => c.name === "prompt_context");
   if (!hasPromptContext) {
     db.exec("ALTER TABLE contacts ADD COLUMN prompt_context TEXT;");
+  }
+  const hasHasReplied = contactColumns.some((c) => c.name === "has_replied");
+  if (!hasHasReplied) {
+    db.exec("ALTER TABLE contacts ADD COLUMN has_replied INTEGER NOT NULL DEFAULT 0;");
+  }
+  const hasLastReplyAt = contactColumns.some((c) => c.name === "last_reply_at");
+  if (!hasLastReplyAt) {
+    db.exec("ALTER TABLE contacts ADD COLUMN last_reply_at TEXT;");
+  }
+  const hasLastReplySubject = contactColumns.some((c) => c.name === "last_reply_subject");
+  if (!hasLastReplySubject) {
+    db.exec("ALTER TABLE contacts ADD COLUMN last_reply_subject TEXT;");
   }
 
   const eventColumns = db.prepare("PRAGMA table_info(outreach_events)").all() as Array<{ name: string }>;
