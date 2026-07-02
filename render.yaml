@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: enchant-outreach-tracker
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm run seed && npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /data/app.db
+    disk:
+      name: outreach-data
+      mountPath: /data
+      sizeGB: 1
