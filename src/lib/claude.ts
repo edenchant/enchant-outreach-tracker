@@ -48,6 +48,7 @@ export type DraftKind = "email" | "linkedin";
 export interface DraftRequest {
   contact: Contact;
   kind: DraftKind;
+  extraContext?: string;
 }
 
 function contactBrief(contact: Contact): string {
@@ -63,7 +64,7 @@ function contactBrief(contact: Contact): string {
   return parts.join("\n");
 }
 
-export async function draftMessage({ contact, kind }: DraftRequest): Promise<string> {
+export async function draftMessage({ contact, kind, extraContext }: DraftRequest): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured on this deployment.");
@@ -76,9 +77,13 @@ export async function draftMessage({ contact, kind }: DraftRequest): Promise<str
       ? "Draft a LinkedIn connection request message (maximum 300 characters) to this contact."
       : "Draft an outreach email to this contact, aimed at organising a meeting.";
 
+  const contextBlock = extraContext?.trim()
+    ? `\n\nAdditional context provided by Ed for this specific draft — make sure it's reflected in the message: ${extraContext.trim()}`
+    : "";
+
   const userMessage = `${instructionLine}
 
-${contactBrief(contact)}
+${contactBrief(contact)}${contextBlock}
 
 This is a one-shot, unattended request — if you would normally ask a clarifying question first, make the most reasonable assumption instead and produce the draft directly. Reply with only the draft itself, no preamble or explanation.`;
 

@@ -70,11 +70,11 @@ export async function undoContact(id: number): Promise<Contact> {
   return data.contact;
 }
 
-export async function draftMessage(id: number, kind: "email" | "linkedin"): Promise<string> {
+export async function draftMessage(id: number, kind: "email" | "linkedin", context?: string): Promise<string> {
   const res = await fetch(`/api/contacts/${id}/draft`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ kind }),
+    body: JSON.stringify({ kind, context }),
   });
   const data = await json<{ draft: string }>(res);
   return data.draft;

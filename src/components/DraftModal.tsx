@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Contact } from "@/lib/types";
 import { draftMessage } from "@/lib/api-client";
 
 export default function DraftModal({ contact, onClose }: { contact: Contact; onClose: () => void }) {
+  const [step, setStep] = useState<"context" | "result">("context");
+  const [contextInput, setContextInput] = useState("");
   const [kind, setKind] = useState<"email" | "linkedin">("email");
   const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  async function generate(k: "email" | "linkedin") {
+  async function generate(k: "email" | "linkedin", contextOverride?: string) {
     setLoading(true);
     setError(null);
     setCopied(false);
+    const contextToUse = contextOverride !== undefined ? contextOverride : contextInput.trim() || undefined;
     try {
-      const result = await draftMessage(contact.id, k);
+      const result = await draftMessage(contact.id, k, contextToUse);
       setDraft(result);
     } catch (e) {
       setError((e as Error).message);
@@ -25,23 +28,16 @@ export default function DraftModal({ contact, onClose }: { contact: Contact; onC
     }
   }
 
-  useEffect(() => {
-    let cancelled = false;
-    draftMessage(contact.id, "email")
-      .then((result) => {
-        if (!cancelled) setDraft(result);
-      })
-      .catch((e) => {
-        if (!cancelled) setError((e as Error).message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  function handleGenerateWithContext() {
+    setStep("result");
+    generate(kind);
+  }
+
+  function handleSkip() {
+    setContextInput("");
+    setStep("result");
+    generate(kind, "");
+  }
 
   function handleKindChange(k: "email" | "linkedin") {
     setKind(k);
@@ -56,6 +52,39 @@ export default function DraftModal({ contact, onClose }: { contact: Contact; onC
   const mailtoHref = contact.email
     ? `mailto:${contact.email}?subject=${encodeURIComponent(`Quick hello from Enchant`)}&body=${encodeURIComponent(draft)}`
     : null;
+
+  if (step === "context") {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <h2>Draft a message for {contact.name}</h2>
+          <div className="form-row full">
+            <label htmlFor="draftContext">Anything specific to include? (optional)</label>
+            <textarea
+              id="draftContext"
+              value={contextInput}
+              onChange={(e) => setContextInput(e.target.value)}
+              rows={5}
+              className="draft-textarea"
+              placeholder="e.g. a recent brand announcement, a mutual contact, something discussed at an event, a specific service to mention…"
+              autoFocus
+            />
+          </div>
+          <div className="modal-actions">
+            <button className="btn" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="btn" onClick={handleSkip}>
+              Skip
+            </button>
+            <button className="btn primary" onClick={handleGenerateWithContext}>
+              Generate draft
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -92,6 +121,9 @@ export default function DraftModal({ contact, onClose }: { contact: Contact; onC
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>
             Close
+          </button>
+          <button className="btn" onClick={() => setStep("context")}>
+            Edit context
           </button>
           <button className="btn" disabled={loading} onClick={() => generate(kind)}>
             Regenerate

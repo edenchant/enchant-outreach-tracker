@@ -11,9 +11,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const body = await req.json().catch(() => ({}));
   const kind: DraftKind = body.kind === "linkedin" ? "linkedin" : "email";
+  const extraContext: string | undefined = typeof body.context === "string" ? body.context : undefined;
 
   try {
-    const draft = await draftMessage({ contact, kind });
+    const draft = await draftMessage({ contact, kind, extraContext });
     return NextResponse.json({ draft });
   } catch (e) {
     const message = (e as Error).message;
