@@ -41,9 +41,6 @@ export interface Contact {
   priorityScore: number;
   effectivePriorityScore: number;
   promptContext: string | null;
-  hasReplied: boolean;
-  lastReplyAt: string | null;
-  lastReplySubject: string | null;
   archived: boolean;
   createdAt: string;
   updatedAt: string;

@@ -118,6 +118,9 @@ export default function QueueView({
           <Link href="/data" className="btn">
             Data grid
           </Link>
+          <Link href="/brand-histories" className="btn">
+            Brand histories
+          </Link>
           <Link href={`/segments/${segment.slug}/settings`} className="btn">
             Settings
           </Link>

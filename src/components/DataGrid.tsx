@@ -152,6 +152,9 @@ export default function DataGrid({
           <Link href="/" className="btn">
             ← Back to queue
           </Link>
+          <Link href="/brand-histories" className="btn">
+            Brand histories
+          </Link>
         </div>
       </header>
 
@@ -280,7 +283,10 @@ export default function DataGrid({
                     )}
                   </td>
                   <td>{row.dueAt ? new Date(row.dueAt).toLocaleDateString("en-GB") : "—"}</td>
-                  <td>{row.priorityScore.toFixed(1)}</td>
+                  <td title={row.brandBonus ? `Boosted from base ${row.priorityScore.toFixed(1)} — ${row.brandBonus.eventType}, ${row.brandBonus.daysAgo}d ago` : undefined}>
+                    {row.effectivePriorityScore.toFixed(1)}
+                    {row.brandBonus ? " 📰" : ""}
+                  </td>
                   <td>{isEditing && draft ? <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /> : row.email ?? ""}</td>
                   <td>
                     {isEditing && draft ? (

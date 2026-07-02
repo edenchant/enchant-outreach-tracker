@@ -1,0 +1,244 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import type { BrandHistoryEntry } from "@/lib/types";
+import {
+  confirmBrandHistory,
+  createBrandHistory,
+  dismissBrandHistory,
+  fetchBrandHistories,
+  triggerBrandScan,
+  type ScanSummaryDTO,
+} from "@/lib/api-client";
+
+const EVENT_TYPES = ["New CMO", "Brand Refresh / Rebrand", "Major ATL Campaign"];
+
+function fmtDate(d: string | null) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function fmtDateTime(d: string | null) {
+  if (!d) return "never";
+  return new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+export default function BrandHistoriesView({
+  initialEntries,
+  initialSummary,
+}: {
+  initialEntries: BrandHistoryEntry[];
+  initialSummary: ScanSummaryDTO;
+}) {
+  const [entries, setEntries] = useState<BrandHistoryEntry[]>(initialEntries);
+  const [brandFilter, setBrandFilter] = useState("");
+  const [summary, setSummary] = useState<ScanSummaryDTO>(initialSummary);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ brand: "", eventType: EVENT_TYPES[0], date: new Date().toISOString().slice(0, 10), note: "" });
+
+  const brandOptions = useMemo(() => {
+    const set = new Set(entries.map((e) => e.brand));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [entries]);
+
+  async function refresh(brand?: string) {
+    const list = await fetchBrandHistories({ brand: brand || undefined });
+    setEntries(list);
+  }
+
+  async function handleFilterChange(brand: string) {
+    setBrandFilter(brand);
+    await refresh(brand);
+  }
+
+  async function handleConfirm(id: number) {
+    await confirmBrandHistory(id);
+    await refresh(brandFilter);
+  }
+
+  async function handleDismiss(id: number) {
+    await dismissBrandHistory(id);
+    await refresh(brandFilter);
+  }
+
+  async function handleScan() {
+    setScanning(true);
+    setScanError(null);
+    try {
+      const result = await triggerBrandScan();
+      setSummary({ ...result, lastRunAt: new Date().toISOString(), ok: true });
+      await refresh(brandFilter);
+    } catch (e) {
+      setScanError((e as Error).message);
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!draft.brand.trim() || !draft.date) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      await createBrandHistory({
+        brand: draft.brand.trim(),
+        eventType: draft.eventType,
+        date: draft.date,
+        note: draft.note.trim() || undefined,
+      });
+      setDraft({ brand: "", eventType: EVENT_TYPES[0], date: new Date().toISOString().slice(0, 10), note: "" });
+      setShowForm(false);
+      await refresh(brandFilter);
+    } catch (e) {
+      setFormError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="wrap">
+      <header className="top">
+        <div>
+          <p className="eyebrow">Enchant · brand histories</p>
+          <h1>Brand Histories</h1>
+        </div>
+        <div className="top-actions">
+          <Link href="/" className="btn">
+            ← Back to queue
+          </Link>
+        </div>
+      </header>
+
+      <div className="brand-history-panel">
+        <div className="brand-history-toolbar">
+          <button className="btn primary" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? "Cancel" : "+ Add entry"}
+          </button>
+          <button className="btn" disabled={scanning} onClick={handleScan}>
+            {scanning ? "Scanning…" : "Scan for brand news now"}
+          </button>
+          <span className="last-scanned">
+            Last scanned: {fmtDateTime(summary.lastRunAt)}
+            {typeof summary.newEntries === "number" ? ` · ${summary.newEntries} new entr${summary.newEntries === 1 ? "y" : "ies"} found` : ""}
+            {summary.ok === false && summary.error ? ` · scan failed: ${summary.error}` : ""}
+          </span>
+        </div>
+        {scanError && <div className="error-text">{scanError}</div>}
+
+        {showForm && (
+          <form onSubmit={handleSubmit} className="form-grid" style={{ marginBottom: 16 }}>
+            <div className="form-row">
+              <label>Brand</label>
+              <input value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} required />
+            </div>
+            <div className="form-row">
+              <label>Event type</label>
+              <select value={draft.eventType} onChange={(e) => setDraft({ ...draft, eventType: e.target.value })}>
+                {EVENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-row">
+              <label>Date</label>
+              <input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} required />
+            </div>
+            <div className="form-row">
+              <label>Note (optional)</label>
+              <input value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} placeholder="Source link or brief detail" />
+            </div>
+            {formError && (
+              <div className="form-row full">
+                <div className="error-text">{formError}</div>
+              </div>
+            )}
+            <div className="form-row full">
+              <button className="btn primary" type="submit" disabled={saving}>
+                {saving ? "Saving…" : "Save entry"}
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="controls" style={{ marginBottom: 0 }}>
+          <select value={brandFilter} onChange={(e) => handleFilterChange(e.target.value)}>
+            <option value="">All brands</option>
+            {brandOptions.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="data-grid-scroll">
+        <table className="settings-table data-grid-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Brand</th>
+              <th>Event type</th>
+              <th>Status</th>
+              <th>Source</th>
+              <th>Note</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((entry) => (
+              <tr key={entry.id}>
+                <td>{fmtDate(entry.date)}</td>
+                <td>{entry.brand}</td>
+                <td>{entry.eventType}</td>
+                <td>
+                  <span className={`status-pill ${entry.status}`}>{entry.status}</span>
+                </td>
+                <td>
+                  <span className="source-tag">{entry.source === "manual" ? "manual" : "news scan"}</span>
+                </td>
+                <td>
+                  {entry.articleUrl ? (
+                    <a href={entry.articleUrl} target="_blank" rel="noreferrer">
+                      {entry.note || "article"}
+                    </a>
+                  ) : (
+                    entry.note ?? ""
+                  )}
+                </td>
+                <td className="data-grid-actions">
+                  {entry.status === "pending" && (
+                    <>
+                      <button className="btn" onClick={() => handleConfirm(entry.id)}>
+                        Confirm
+                      </button>
+                      <button className="btn" onClick={() => handleDismiss(entry.id)}>
+                        Dismiss
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {entries.length === 0 && <div className="empty">No brand history entries yet.</div>}
+
+      <div className="footnote">
+        Entries dated within the last 60 days give that brand&apos;s contacts a modest, decaying priority boost (up to
+        +15% on the day of the event). Pending entries from the automated news scan don&apos;t affect priority until
+        confirmed.
+      </div>
+    </div>
+  );
+}

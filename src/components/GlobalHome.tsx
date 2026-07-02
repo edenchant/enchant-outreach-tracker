@@ -106,6 +106,9 @@ export default function GlobalHome({
           <Link href="/data" className="btn">
             Data grid
           </Link>
+          <Link href="/brand-histories" className="btn">
+            Brand histories
+          </Link>
           <div className="today-date" suppressHydrationWarning>
             {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </div>

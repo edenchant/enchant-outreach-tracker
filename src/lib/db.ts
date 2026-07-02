@@ -101,19 +101,6 @@ function migrate(db: DatabaseSync) {
   if (!hasPromptContext) {
     db.exec("ALTER TABLE contacts ADD COLUMN prompt_context TEXT;");
   }
-  const hasHasReplied = contactColumns.some((c) => c.name === "has_replied");
-  if (!hasHasReplied) {
-    db.exec("ALTER TABLE contacts ADD COLUMN has_replied INTEGER NOT NULL DEFAULT 0;");
-  }
-  const hasLastReplyAt = contactColumns.some((c) => c.name === "last_reply_at");
-  if (!hasLastReplyAt) {
-    db.exec("ALTER TABLE contacts ADD COLUMN last_reply_at TEXT;");
-  }
-  const hasLastReplySubject = contactColumns.some((c) => c.name === "last_reply_subject");
-  if (!hasLastReplySubject) {
-    db.exec("ALTER TABLE contacts ADD COLUMN last_reply_subject TEXT;");
-  }
-
   const eventColumns = db.prepare("PRAGMA table_info(outreach_events)").all() as Array<{ name: string }>;
   const hasType = eventColumns.some((c) => c.name === "type");
   if (!hasType) {

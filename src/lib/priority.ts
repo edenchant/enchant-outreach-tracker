@@ -31,3 +31,16 @@ export function brandBonusMultiplier(daysSinceEvent: number | null): number {
   const decay = 1 - daysSinceEvent / BRAND_HISTORY_RECENCY_DAYS;
   return 1 + BRAND_HISTORY_MAX_BONUS * decay;
 }
+
+// SQL equivalent of brandBonusMultiplier(), for the one read path (the paginated
+// data grid) that needs the bonus applied inside the database's own ORDER BY
+// rather than in JS after fetching. Sourced from the same two constants above
+// so the window/bonus size is only ever defined in one place.
+export function brandBonusSqlExpression(priorityExpr: string, lastEventDateExpr: string): string {
+  return `(CASE
+    WHEN ${lastEventDateExpr} IS NULL THEN ${priorityExpr}
+    WHEN (julianday('now') - julianday(${lastEventDateExpr})) > ${BRAND_HISTORY_RECENCY_DAYS} THEN ${priorityExpr}
+    WHEN (julianday('now') - julianday(${lastEventDateExpr})) < 0 THEN ${priorityExpr}
+    ELSE ${priorityExpr} * (1 + ${BRAND_HISTORY_MAX_BONUS} * (1 - (julianday('now') - julianday(${lastEventDateExpr})) / ${BRAND_HISTORY_RECENCY_DAYS}))
+  END)`;
+}

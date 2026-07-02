@@ -1,4 +1,4 @@
-import type { Contact, GridContact, Segment, Stage, Tier } from "./types";
+import type { BrandHistoryEntry, Contact, GridContact, Segment, Stage, Tier } from "./types";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -190,4 +190,62 @@ export async function updateStageApi(id: number, payload: Partial<Pick<Stage, "n
     body: JSON.stringify(payload),
   });
   return json<{ stage: Stage }>(res);
+}
+
+export async function fetchBrandHistories(filters: { brand?: string; status?: "confirmed" | "pending" } = {}): Promise<BrandHistoryEntry[]> {
+  const params = new URLSearchParams();
+  if (filters.brand) params.set("brand", filters.brand);
+  if (filters.status) params.set("status", filters.status);
+  const res = await fetch(`/api/brand-histories?${params.toString()}`);
+  const data = await json<{ entries: BrandHistoryEntry[] }>(res);
+  return data.entries;
+}
+
+export interface NewBrandHistoryPayload {
+  brand: string;
+  eventType: string;
+  date: string;
+  note?: string;
+}
+
+export async function createBrandHistory(payload: NewBrandHistoryPayload): Promise<BrandHistoryEntry> {
+  const res = await fetch(`/api/brand-histories`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await json<{ entry: BrandHistoryEntry }>(res);
+  return data.entry;
+}
+
+export async function confirmBrandHistory(id: number): Promise<BrandHistoryEntry> {
+  const res = await fetch(`/api/brand-histories/${id}/confirm`, { method: "POST" });
+  const data = await json<{ entry: BrandHistoryEntry }>(res);
+  return data.entry;
+}
+
+export async function dismissBrandHistory(id: number): Promise<void> {
+  const res = await fetch(`/api/brand-histories/${id}/dismiss`, { method: "POST" });
+  await json(res);
+}
+
+export interface ScanSummaryDTO {
+  lastRunAt: string | null;
+  brandsScanned?: number;
+  newEntries?: number;
+  errors?: string[];
+  error?: string;
+  ok?: boolean;
+}
+
+export async function fetchScanSummary(): Promise<ScanSummaryDTO> {
+  const res = await fetch(`/api/brand-histories/scan`);
+  const data = await json<{ summary: ScanSummaryDTO }>(res);
+  return data.summary;
+}
+
+export async function triggerBrandScan(): Promise<{ brandsScanned: number; newEntries: number; errors: string[] }> {
+  const res = await fetch(`/api/brand-histories/scan`, { method: "POST" });
+  const data = await json<{ result: { brandsScanned: number; newEntries: number; errors: string[] } }>(res);
+  return data.result;
 }

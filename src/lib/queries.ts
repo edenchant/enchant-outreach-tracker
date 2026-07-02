@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw sqlite rows are untyped */
 import { getDb } from "./db";
-import { classify, computePriority } from "./priority";
-import type { Contact, GridContact, OutreachEvent, Segment, Stage, Tier } from "./types";
+import { brandBonusMultiplier, brandBonusSqlExpression, classify, computePriority, daysBetween } from "./priority";
+import type { BrandHistoryEntry, Contact, GridContact, OutreachEvent, Segment, Stage, Tier } from "./types";
 
 function toSegment(row: any): Segment {
   return { id: row.id, name: row.name, slug: row.slug, createdAt: row.created_at };
@@ -46,6 +46,7 @@ function toContact(row: any, now: Date): Contact {
     lastContactedAt: row.last_contacted_at,
     dueAt: row.due_at,
     priorityScore: row.priority_score,
+    effectivePriorityScore: row.priority_score,
     promptContext: row.prompt_context,
     archived: !!row.archived,
     createdAt: row.created_at,
@@ -53,6 +54,37 @@ function toContact(row: any, now: Date): Contact {
     tier: row.tier_id_j ? toTier({ id: row.tier_id_j, segment_id: row.segment_id, letter: row.tier_letter, label: row.tier_label, weight: row.tier_weight, sort_order: row.tier_sort_order }) : null,
     stage: row.stage_id_j ? toStage({ id: row.stage_id_j, segment_id: row.segment_id, name: row.stage_name, sort_order: row.stage_sort_order, interval_days: row.stage_interval_days, weight: row.stage_weight, is_terminal: row.stage_is_terminal }) : null,
     status: classify(row.due_at, now),
+    brandBonus: null,
+  };
+}
+
+// Most recent confirmed brand-history entry per brand, used to apply the
+// priority bonus at read time (see brandBonusMultiplier in priority.ts).
+// Fetched once per request and reused across every contact in the result set.
+function getBrandEventMap(): Map<string, { eventType: string; date: string }> {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT brand, event_type, date FROM brand_histories bh
+       WHERE status = 'confirmed'
+       AND date = (SELECT MAX(date) FROM brand_histories bh2 WHERE bh2.brand = bh.brand AND bh2.status = 'confirmed')`
+    )
+    .all() as any[];
+  const map = new Map<string, { eventType: string; date: string }>();
+  for (const r of rows) map.set(r.brand, { eventType: r.event_type, date: r.date });
+  return map;
+}
+
+function applyBrandBonus<T extends Contact>(contact: T, brandMap: Map<string, { eventType: string; date: string }>, now: Date): T {
+  const entry = contact.brand ? brandMap.get(contact.brand) : undefined;
+  if (!entry) return contact;
+  const daysAgo = daysBetween(now, new Date(entry.date));
+  const multiplier = brandBonusMultiplier(daysAgo);
+  if (multiplier <= 1) return contact;
+  return {
+    ...contact,
+    effectivePriorityScore: contact.priorityScore * multiplier,
+    brandBonus: { eventType: entry.eventType, date: entry.date, daysAgo: Math.floor(daysAgo) },
   };
 }
 
@@ -223,7 +255,9 @@ export function listContacts(filters: ContactFilters): Contact[] {
   }
 
   const rows = db.prepare(`${CONTACT_SELECT} WHERE ${clauses.join(" AND ")} ORDER BY c.priority_score DESC`).all(...params);
-  let contacts = rows.map((r) => toContact(r, now));
+  const brandMap = getBrandEventMap();
+  let contacts = rows.map((r) => applyBrandBonus(toContact(r, now), brandMap, now));
+  contacts.sort((a, b) => b.effectivePriorityScore - a.effectivePriorityScore);
   if (filters.status) {
     contacts = contacts.filter((c) => c.status === filters.status);
   }
@@ -237,10 +271,15 @@ const GRID_SORT_COLUMNS: Record<string, string> = {
   followers: "c.followers",
   tier: "t.weight",
   stage: "s.sort_order",
-  priority: "c.priority_score",
+  priority: "effective_priority_score",
   due: "c.due_at",
   segment: "seg.name",
 };
+
+const BRAND_LAST_EVENT_DATE_SQL =
+  "(SELECT MAX(date) FROM brand_histories bh WHERE bh.brand = c.brand AND bh.status = 'confirmed')";
+const BRAND_LAST_EVENT_TYPE_SQL =
+  "(SELECT event_type FROM brand_histories bh2 WHERE bh2.brand = c.brand AND bh2.status = 'confirmed' ORDER BY date DESC LIMIT 1)";
 
 export interface GridFilters {
   segmentSlug?: string;
@@ -298,7 +337,10 @@ export function listAllContacts(filters: GridFilters): GridResult {
     .prepare(
       `SELECT c.*, seg.name as segment_name, seg.slug as segment_slug,
         t.id as tier_id_j, t.letter as tier_letter, t.label as tier_label, t.weight as tier_weight, t.sort_order as tier_sort_order,
-        s.id as stage_id_j, s.name as stage_name, s.sort_order as stage_sort_order, s.interval_days as stage_interval_days, s.weight as stage_weight, s.is_terminal as stage_is_terminal
+        s.id as stage_id_j, s.name as stage_name, s.sort_order as stage_sort_order, s.interval_days as stage_interval_days, s.weight as stage_weight, s.is_terminal as stage_is_terminal,
+        ${BRAND_LAST_EVENT_DATE_SQL} as brand_last_event_date,
+        ${BRAND_LAST_EVENT_TYPE_SQL} as brand_last_event_type,
+        ${brandBonusSqlExpression("c.priority_score", BRAND_LAST_EVENT_DATE_SQL)} as effective_priority_score
        FROM contacts c
        JOIN segments seg ON seg.id = c.segment_id
        LEFT JOIN tiers t ON t.id = c.tier_id
@@ -309,11 +351,20 @@ export function listAllContacts(filters: GridFilters): GridResult {
     )
     .all(...params, pageSize, offset);
 
-  const gridRows: GridContact[] = rows.map((r: any) => ({
-    ...toContact(r, now),
-    segmentName: r.segment_name,
-    segmentSlug: r.segment_slug,
-  }));
+  const gridRows: GridContact[] = rows.map((r: any) => {
+    const contact = toContact(r, now);
+    const withScore: GridContact = {
+      ...contact,
+      effectivePriorityScore: r.effective_priority_score,
+      segmentName: r.segment_name,
+      segmentSlug: r.segment_slug,
+    };
+    if (r.brand_last_event_date && r.effective_priority_score > contact.priorityScore) {
+      const daysAgo = Math.floor(daysBetween(now, new Date(r.brand_last_event_date)));
+      withScore.brandBonus = { eventType: r.brand_last_event_type, date: r.brand_last_event_date, daysAgo };
+    }
+    return withScore;
+  });
 
   return { rows: gridRows, total: totalRow.n };
 }
@@ -321,7 +372,9 @@ export function listAllContacts(filters: GridFilters): GridResult {
 export function getContact(id: number): Contact | null {
   const db = getDb();
   const row = db.prepare(`${CONTACT_SELECT} WHERE c.id = ?`).get(id);
-  return row ? toContact(row, new Date()) : null;
+  if (!row) return null;
+  const now = new Date();
+  return applyBrandBonus(toContact(row, now), getBrandEventMap(), now);
 }
 
 export interface ContactStats {
@@ -352,7 +405,9 @@ export function getTopToday(segmentId: number, limit = 10): Contact[] {
   const db = getDb();
   const now = new Date();
   const rows = db.prepare(`${CONTACT_SELECT} WHERE c.segment_id = ? AND c.archived = 0 ORDER BY c.priority_score DESC`).all(segmentId);
-  const contacts = rows.map((r) => toContact(r, now));
+  const brandMap = getBrandEventMap();
+  const contacts = rows.map((r) => applyBrandBonus(toContact(r, now), brandMap, now));
+  contacts.sort((a, b) => b.effectivePriorityScore - a.effectivePriorityScore);
   return contacts.filter((c) => c.status === "overdue" || c.status === "today").slice(0, limit);
 }
 
@@ -387,11 +442,19 @@ export function getGlobalTopToday(limit = 10): GridContact[] {
   const db = getDb();
   const now = new Date();
   const rows = db.prepare(`${GLOBAL_CONTACT_SELECT} WHERE c.archived = 0 ORDER BY c.priority_score DESC`).all();
-  const contacts: GridContact[] = rows.map((r: any) => ({
-    ...toContact(r, now),
-    segmentName: r.segment_name,
-    segmentSlug: r.segment_slug,
-  }));
+  const brandMap = getBrandEventMap();
+  const contacts: GridContact[] = rows.map((r: any) =>
+    applyBrandBonus(
+      {
+        ...toContact(r, now),
+        segmentName: r.segment_name,
+        segmentSlug: r.segment_slug,
+      },
+      brandMap,
+      now
+    )
+  );
+  contacts.sort((a, b) => b.effectivePriorityScore - a.effectivePriorityScore);
   return contacts.filter((c) => c.status === "overdue" || c.status === "today").slice(0, limit);
 }
 
@@ -564,4 +627,118 @@ export function getContactHistory(id: number): OutreachEvent[] {
     type: r.type,
     contactedAt: r.contacted_at,
   }));
+}
+
+// ---- Brand Histories ----
+
+function toBrandHistory(row: any): BrandHistoryEntry {
+  return {
+    id: row.id,
+    brand: row.brand,
+    eventType: row.event_type,
+    date: row.date,
+    note: row.note,
+    source: row.source,
+    articleUrl: row.article_url,
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
+export interface BrandHistoryFilters {
+  brand?: string;
+  status?: "confirmed" | "pending";
+}
+
+export function listBrandHistories(filters: BrandHistoryFilters = {}): BrandHistoryEntry[] {
+  const db = getDb();
+  const clauses: string[] = [];
+  const params: any[] = [];
+  if (filters.brand) {
+    clauses.push("brand = ?");
+    params.push(filters.brand);
+  }
+  if (filters.status) {
+    clauses.push("status = ?");
+    params.push(filters.status);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  const rows = db.prepare(`SELECT * FROM brand_histories ${where} ORDER BY date DESC, id DESC`).all(...params);
+  return rows.map(toBrandHistory);
+}
+
+export function getBrandHistoryEntry(id: number): BrandHistoryEntry | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM brand_histories WHERE id = ?").get(id);
+  return row ? toBrandHistory(row) : null;
+}
+
+export interface NewBrandHistoryInput {
+  brand: string;
+  eventType: string;
+  date: string;
+  note?: string | null;
+  source?: "manual" | "news_api";
+  articleUrl?: string | null;
+  status?: "confirmed" | "pending";
+}
+
+export function createBrandHistoryEntry(input: NewBrandHistoryInput): BrandHistoryEntry {
+  const db = getDb();
+  const source = input.source ?? "manual";
+  const status = input.status ?? (source === "manual" ? "confirmed" : "pending");
+  const info = db
+    .prepare(
+      `INSERT INTO brand_histories (brand, event_type, date, note, source, article_url, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(input.brand, input.eventType, input.date, input.note ?? null, source, input.articleUrl ?? null, status);
+  return getBrandHistoryEntry(Number(info.lastInsertRowid))!;
+}
+
+export function confirmBrandHistoryEntry(id: number): BrandHistoryEntry {
+  const db = getDb();
+  const current = getBrandHistoryEntry(id);
+  if (!current) throw new Error("Brand history entry not found");
+  db.prepare("UPDATE brand_histories SET status = 'confirmed' WHERE id = ?").run(id);
+  return getBrandHistoryEntry(id)!;
+}
+
+export function dismissBrandHistoryEntry(id: number): void {
+  const db = getDb();
+  db.prepare("DELETE FROM brand_histories WHERE id = ?").run(id);
+}
+
+// Dedup guard for the automated news scan: skip creating a new entry if one
+// for the same brand + event type already exists dated on/after `sinceDate`,
+// so five articles about one rebrand don't produce five log entries.
+export function findRecentSimilarBrandEvent(brand: string, eventType: string, sinceDate: string): BrandHistoryEntry | null {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT * FROM brand_histories WHERE brand = ? AND event_type = ? AND date >= ? ORDER BY date DESC LIMIT 1`)
+    .get(brand, eventType, sinceDate);
+  return row ? toBrandHistory(row) : null;
+}
+
+export function listDistinctBrands(): string[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT DISTINCT brand FROM contacts WHERE brand IS NOT NULL AND trim(brand) != '' ORDER BY brand ASC")
+    .all() as any[];
+  return rows.map((r) => r.brand as string);
+}
+
+// ---- App settings (small key/value store; used for scheduler bookkeeping) ----
+
+export function getSetting(key: string): string | null {
+  const db = getDb();
+  const row = db.prepare("SELECT value FROM app_settings WHERE key = ?").get(key) as any;
+  return row ? row.value : null;
+}
+
+export function setSetting(key: string, value: string): void {
+  const db = getDb();
+  db.prepare(
+    "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  ).run(key, value);
 }

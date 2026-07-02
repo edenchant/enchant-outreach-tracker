@@ -55,6 +55,11 @@ export default function ContactCard({
           </button>
           <span className={`tier-badge tier-${tl}`}>{c.tier?.label ?? "—"}</span>
           {segmentLabel && <span className="segment-pill">{segmentLabel}</span>}
+          {c.brandBonus && (
+            <span className="brand-badge" title={`Boosted: ${c.brandBonus.eventType} at ${c.brand}, ${c.brandBonus.daysAgo}d ago`}>
+              📰 {c.brandBonus.eventType} · {c.brandBonus.daysAgo}d ago
+            </span>
+          )}
         </div>
         <div className="meta">
           <b>{c.role || "Unknown role"}</b> · {c.brand || ""}
@@ -74,7 +79,10 @@ export default function ContactCard({
       <div className="stage-pill">{c.stage?.name ?? "—"}</div>
       <div className="due-info">
         <div className="rel">{relTime(c.dueAt)}</div>
-        <div className="score">priority {c.priorityScore.toFixed(1)}</div>
+        <div className="score">
+          priority {c.effectivePriorityScore.toFixed(1)}
+          {c.brandBonus && c.effectivePriorityScore > c.priorityScore ? ` (base ${c.priorityScore.toFixed(1)})` : ""}
+        </div>
       </div>
       <div className="actions">
         {c.linkedin && (
