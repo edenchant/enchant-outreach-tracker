@@ -276,7 +276,9 @@ export default function QueueView({
       <div className="footnote">
         {segment.name} segment · {stats.total} contacts. Priority score is computed from tier weight × stage weight ×
         followers, and updates automatically as contacts move through the pipeline. Marking a contact as contacted
-        advances them to the next stage and recalculates their next due date.
+        advances them to the next stage and recalculates their next due date. Once someone at a brand is marked
+        contacted, the Top 10 above won&apos;t recommend anyone else at that brand until tomorrow — this filtered list
+        below still shows everyone.
       </div>
 
       {modalMode && (

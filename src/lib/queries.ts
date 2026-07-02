@@ -401,14 +401,36 @@ export function getStats(segmentId: number): ContactStats {
   };
 }
 
+// Brands with at least one contact already marked "contacted" today, so the
+// Top 10 views can hold off recommending a second person at the same brand
+// until tomorrow. Scoped to the recommendation views only — the full
+// filterable queue and data grid still show everyone, so a second contact
+// at the same brand can always be reached manually if that's genuinely
+// wanted the same day.
+function brandsContactedToday(): Set<string> {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT c.brand FROM outreach_events oe
+       JOIN contacts c ON c.id = oe.contact_id
+       WHERE oe.type = 'contacted' AND date(oe.contacted_at) = date('now') AND c.brand IS NOT NULL`
+    )
+    .all() as any[];
+  return new Set(rows.map((r) => r.brand as string));
+}
+
 export function getTopToday(segmentId: number, limit = 10): Contact[] {
   const db = getDb();
   const now = new Date();
   const rows = db.prepare(`${CONTACT_SELECT} WHERE c.segment_id = ? AND c.archived = 0 ORDER BY c.priority_score DESC`).all(segmentId);
   const brandMap = getBrandEventMap();
+  const contactedBrands = brandsContactedToday();
   const contacts = rows.map((r) => applyBrandBonus(toContact(r, now), brandMap, now));
   contacts.sort((a, b) => b.effectivePriorityScore - a.effectivePriorityScore);
-  return contacts.filter((c) => c.status === "overdue" || c.status === "today").slice(0, limit);
+  return contacts
+    .filter((c) => c.status === "overdue" || c.status === "today")
+    .filter((c) => !c.brand || !contactedBrands.has(c.brand))
+    .slice(0, limit);
 }
 
 const GLOBAL_CONTACT_SELECT = `
@@ -443,6 +465,7 @@ export function getGlobalTopToday(limit = 10): GridContact[] {
   const now = new Date();
   const rows = db.prepare(`${GLOBAL_CONTACT_SELECT} WHERE c.archived = 0 ORDER BY c.priority_score DESC`).all();
   const brandMap = getBrandEventMap();
+  const contactedBrands = brandsContactedToday();
   const contacts: GridContact[] = rows.map((r: any) =>
     applyBrandBonus(
       {
@@ -455,7 +478,10 @@ export function getGlobalTopToday(limit = 10): GridContact[] {
     )
   );
   contacts.sort((a, b) => b.effectivePriorityScore - a.effectivePriorityScore);
-  return contacts.filter((c) => c.status === "overdue" || c.status === "today").slice(0, limit);
+  return contacts
+    .filter((c) => c.status === "overdue" || c.status === "today")
+    .filter((c) => !c.brand || !contactedBrands.has(c.brand))
+    .slice(0, limit);
 }
 
 export interface NewContactInput {
