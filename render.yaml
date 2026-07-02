@@ -11,6 +11,8 @@ services:
         value: production
       - key: DATABASE_PATH
         value: /data/app.db
+      - key: ANTHROPIC_API_KEY
+        sync: false
     disk:
       name: outreach-data
       mountPath: /data

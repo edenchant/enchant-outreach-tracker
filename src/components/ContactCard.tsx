@@ -27,6 +27,7 @@ export default function ContactCard({
   onEdit,
   onDelete,
   onMarkContacted,
+  onDraft,
 }: {
   contact: Contact;
   rank: number;
@@ -36,6 +37,7 @@ export default function ContactCard({
   onEdit: () => void;
   onDelete: () => void;
   onMarkContacted: () => void;
+  onDraft: () => void;
 }) {
   const tl = tierLetter(c.tier?.label);
 
@@ -80,6 +82,9 @@ export default function ContactCard({
             ✉
           </a>
         )}
+        <button title="Draft a message" onClick={onDraft}>
+          ✨
+        </button>
         <button title="Edit" onClick={onEdit}>
           ✎
         </button>

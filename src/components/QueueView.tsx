@@ -14,6 +14,7 @@ import Link from "next/link";
 import SegmentTabs from "./SegmentTabs";
 import ContactFormModal from "./ContactFormModal";
 import ContactCard from "./ContactCard";
+import DraftModal from "./DraftModal";
 
 interface Stats {
   overdue: number;
@@ -51,6 +52,7 @@ export default function QueueView({
   const [toast, setToast] = useState<{ id: number; name: string } | null>(null);
   const [topToday, setTopToday] = useState<Contact[]>(initialTopToday);
   const [showTopTen, setShowTopTen] = useState(true);
+  const [draftingContact, setDraftingContact] = useState<Contact | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function refresh() {
@@ -173,6 +175,7 @@ export default function QueueView({
                   }}
                   onDelete={() => handleDelete(c.id)}
                   onMarkContacted={() => handleMarkContacted(c.id, c.name)}
+                  onDraft={() => setDraftingContact(c)}
                 />
               ))}
             </div>
@@ -246,6 +249,7 @@ export default function QueueView({
             }}
             onDelete={() => handleDelete(c.id)}
             onMarkContacted={() => handleMarkContacted(c.id, c.name)}
+            onDraft={() => setDraftingContact(c)}
           />
         ))}
       </div>
@@ -270,6 +274,8 @@ export default function QueueView({
           }}
         />
       )}
+
+      {draftingContact && <DraftModal contact={draftingContact} onClose={() => setDraftingContact(null)} />}
     </div>
   );
 }
