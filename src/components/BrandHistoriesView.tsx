@@ -127,10 +127,23 @@ export default function BrandHistoriesView({
           <span className="last-scanned">
             Last scanned: {fmtDateTime(summary.lastRunAt)}
             {typeof summary.newEntries === "number" ? ` · ${summary.newEntries} new entr${summary.newEntries === 1 ? "y" : "ies"} found` : ""}
+            {typeof summary.brandsScanned === "number" ? ` · ${summary.brandsScanned} brands checked` : ""}
             {summary.ok === false && summary.error ? ` · scan failed: ${summary.error}` : ""}
           </span>
         </div>
         {scanError && <div className="error-text">{scanError}</div>}
+        {summary.errors && summary.errors.length > 0 && (
+          <div className="error-text" style={{ marginBottom: 14 }}>
+            {summary.errors.length} of {summary.brandsScanned ?? "?"} brand{summary.brandsScanned === 1 ? "" : "s"} failed
+            during the last scan:
+            <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+              {summary.errors.slice(0, 6).map((err, i) => (
+                <li key={i}>{err}</li>
+              ))}
+            </ul>
+            {summary.errors.length > 6 && <div>…and {summary.errors.length - 6} more.</div>}
+          </div>
+        )}
 
         {showForm && (
           <form onSubmit={handleSubmit} className="form-grid" style={{ marginBottom: 16 }}>
