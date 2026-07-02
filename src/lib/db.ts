@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   last_contacted_at TEXT,
   due_at TEXT,
   priority_score REAL NOT NULL DEFAULT 0,
+  prompt_context TEXT,
   archived INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -74,12 +75,21 @@ CREATE INDEX IF NOT EXISTS idx_contacts_priority ON contacts(priority_score);
 CREATE INDEX IF NOT EXISTS idx_events_contact ON outreach_events(contact_id);
 `;
 
+function migrate(db: DatabaseSync) {
+  const columns = db.prepare("PRAGMA table_info(contacts)").all() as Array<{ name: string }>;
+  const hasPromptContext = columns.some((c) => c.name === "prompt_context");
+  if (!hasPromptContext) {
+    db.exec("ALTER TABLE contacts ADD COLUMN prompt_context TEXT;");
+  }
+}
+
 function createDb(): DatabaseSync {
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
   const db = new DatabaseSync(DB_PATH);
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec(SCHEMA);
+  migrate(db);
   return db;
 }
 

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getDb } from "../src/lib/db";
-import { createSegment, getStages, getTiers } from "../src/lib/queries";
+import { createSegment, deleteSegment, getSegmentBySlug, getStages, getTiers, DEFAULT_TIERS } from "../src/lib/queries";
 import { computePriority } from "../src/lib/priority";
 
 interface RawContact {
@@ -15,50 +15,56 @@ interface RawContact {
   email: string | null;
   action: string | null;
   timeToNext: number | null;
-  dayCheck: string | null;
   last: string | null;
-  priority: number | null;
   due: string | null;
+  priority: number | null;
+  promptContext: string | null;
 }
 
-const STAGE_NAME_MAP: Record<string, string> = {
-  "LinkedIn Add": "LinkedIn Add",
-  "First Reach": "First Reach",
-  "Second Reach": "Second Reach",
-  "Third Reach": "Third Reach",
-};
+const SEGMENTS: Array<{ name: string; slug: string; file: string }> = [
+  { name: "In-House", slug: "in-house", file: "in-house.json" },
+  { name: "Agency", slug: "agency", file: "agency.json" },
+  { name: "Top 120", slug: "top-120", file: "top-120.json" },
+  { name: "Non-120", slug: "non-120", file: "non-120.json" },
+  { name: "Reactive", slug: "reactive", file: "reactive.json" },
+  { name: "Other Brand", slug: "other-brand", file: "other-brand.json" },
+];
 
-function main() {
+function seedSegment(name: string, slug: string, file: string) {
   const db = getDb();
 
-  const existing = db.prepare("SELECT * FROM segments WHERE slug = ?").get("in-house");
+  const existing = getSegmentBySlug(slug);
   if (existing) {
-    console.log("In-House segment already seeded, skipping.");
-    return;
+    const tierCount = getTiers(existing.id).length;
+    if (tierCount >= DEFAULT_TIERS.length) {
+      console.log(`Segment "${name}" already seeded on the current pipeline, skipping.`);
+      return;
+    }
+    console.log(`Segment "${name}" found on an old pipeline shape, rebuilding.`);
+    deleteSegment(existing.id);
   }
 
-  const segment = createSegment("In-House", "in-house");
+  const segment = createSegment(name, slug);
   const tiers = getTiers(segment.id);
   const stages = getStages(segment.id);
   const tierByLetter = new Map(tiers.map((t) => [t.letter, t]));
   const stageByName = new Map(stages.map((s) => [s.name, s]));
 
-  const rawPath = path.join(__dirname, "seed-data", "in-house.json");
+  const rawPath = path.join(__dirname, "seed-data", file);
   const raw: RawContact[] = JSON.parse(fs.readFileSync(rawPath, "utf-8"));
 
   const insert = db.prepare(
-    `INSERT INTO contacts (segment_id, tier_id, stage_id, brand, sub_brand, name, role, followers, linkedin, email, last_contacted_at, due_at, priority_score)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO contacts (segment_id, tier_id, stage_id, brand, sub_brand, name, role, followers, linkedin, email, last_contacted_at, due_at, priority_score, prompt_context)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   let count = 0;
   for (const c of raw) {
-    const tierLetter = c.tier ? c.tier.charAt(0) : null;
+    const tierLetter = c.tier ? c.tier.charAt(0).toUpperCase() : null;
     const tier = tierLetter ? tierByLetter.get(tierLetter) : null;
-    const stageName = c.action ? STAGE_NAME_MAP[c.action] : null;
-    const stage = stageName ? stageByName.get(stageName) : null;
+    const stage = c.action ? stageByName.get(c.action) : null;
 
-    const priority = tier && stage ? computePriority(c.followers, tier.weight, stage.weight) : c.priority ?? 0;
+    const priority = computePriority(c.followers, tier?.weight ?? 0, stage?.weight ?? 0);
 
     insert.run(
       segment.id,
@@ -73,12 +79,19 @@ function main() {
       c.email ?? null,
       c.last ?? null,
       c.due ?? null,
-      priority
+      priority,
+      c.promptContext ?? null
     );
     count++;
   }
 
-  console.log(`Seeded segment "In-House" with ${count} contacts.`);
+  console.log(`Seeded segment "${name}" with ${count} contacts.`);
+}
+
+function main() {
+  for (const s of SEGMENTS) {
+    seedSegment(s.name, s.slug, s.file);
+  }
 }
 
 main();

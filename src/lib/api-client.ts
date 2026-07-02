@@ -1,4 +1,4 @@
-import type { Contact, Stage, Tier } from "./types";
+import type { Contact, GridContact, Segment, Stage, Tier } from "./types";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -32,6 +32,12 @@ export async function fetchStats(slug: string) {
   const res = await fetch(`/api/segments/${slug}/stats`);
   const data = await json<{ stats: { overdue: number; today: number; upcoming: number; total: number } }>(res);
   return data.stats;
+}
+
+export async function fetchTopToday(slug: string): Promise<Contact[]> {
+  const res = await fetch(`/api/segments/${slug}/top10`);
+  const data = await json<{ contacts: Contact[] }>(res);
+  return data.contacts;
 }
 
 export async function markContacted(id: number): Promise<Contact> {
@@ -95,6 +101,39 @@ export async function fetchHistory(id: number): Promise<OutreachEventDTO[]> {
   const res = await fetch(`/api/contacts/${id}/history`);
   const data = await json<{ events: OutreachEventDTO[] }>(res);
   return data.events;
+}
+
+export interface GridQuery {
+  segment?: string;
+  tier?: string;
+  search?: string;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+export interface GridResultDTO {
+  rows: GridContact[];
+  total: number;
+}
+
+export async function fetchGrid(q: GridQuery): Promise<GridResultDTO> {
+  const params = new URLSearchParams();
+  if (q.segment) params.set("segment", q.segment);
+  if (q.tier) params.set("tier", q.tier);
+  if (q.search) params.set("search", q.search);
+  if (q.sortBy) params.set("sortBy", q.sortBy);
+  if (q.sortDir) params.set("sortDir", q.sortDir);
+  if (q.page) params.set("page", String(q.page));
+  if (q.pageSize) params.set("pageSize", String(q.pageSize));
+  const res = await fetch(`/api/data-grid?${params.toString()}`);
+  return json<GridResultDTO>(res);
+}
+
+export async function fetchSegmentConfig(slug: string): Promise<{ segment: Segment; tiers: Tier[]; stages: Stage[] }> {
+  const res = await fetch(`/api/segments/${slug}/config`);
+  return json(res);
 }
 
 export async function createSegment(name: string) {

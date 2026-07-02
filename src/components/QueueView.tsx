@@ -6,34 +6,20 @@ import {
   deleteContact as apiDeleteContact,
   fetchContacts,
   fetchStats,
+  fetchTopToday,
   markContacted as apiMarkContacted,
   undoContact as apiUndoContact,
 } from "@/lib/api-client";
 import Link from "next/link";
 import SegmentTabs from "./SegmentTabs";
 import ContactFormModal from "./ContactFormModal";
-import HistoryPanel from "./HistoryPanel";
+import ContactCard from "./ContactCard";
 
 interface Stats {
   overdue: number;
   today: number;
   upcoming: number;
   total: number;
-}
-
-function relTime(dueAt: string | null): string {
-  if (!dueAt) return "No due date";
-  const diffMs = new Date(dueAt).getTime() - Date.now();
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
-  if (diffDays === 0) return "Due today";
-  if (diffDays === 1) return "Due tomorrow";
-  return `Due in ${diffDays}d`;
-}
-
-function tierLetter(label?: string | null): string {
-  if (!label) return "?";
-  return label.charAt(0);
 }
 
 export default function QueueView({
@@ -43,6 +29,7 @@ export default function QueueView({
   stages,
   initialContacts,
   initialStats,
+  initialTopToday,
 }: {
   allSegments: Segment[];
   segment: Segment;
@@ -50,6 +37,7 @@ export default function QueueView({
   stages: Stage[];
   initialContacts: Contact[];
   initialStats: Stats;
+  initialTopToday: Contact[];
 }) {
   const [contacts, setContacts] = useState<Contact[]>(initialContacts);
   const [stats, setStats] = useState<Stats>(initialStats);
@@ -61,15 +49,19 @@ export default function QueueView({
   const [modalMode, setModalMode] = useState<"add" | "edit" | null>(null);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [toast, setToast] = useState<{ id: number; name: string } | null>(null);
+  const [topToday, setTopToday] = useState<Contact[]>(initialTopToday);
+  const [showTopTen, setShowTopTen] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function refresh() {
-    const [c, s] = await Promise.all([
+    const [c, s, t] = await Promise.all([
       fetchContacts({ segment: segment.slug, search: search || undefined, tier: tierId, stage: stageId, status }),
       fetchStats(segment.slug),
+      fetchTopToday(segment.slug),
     ]);
     setContacts(c);
     setStats(s);
+    setTopToday(t);
   }
 
   useEffect(() => {
@@ -114,6 +106,9 @@ export default function QueueView({
           <h1>Today&apos;s Outreach Queue</h1>
         </div>
         <div className="top-actions">
+          <Link href="/data" className="btn">
+            Data grid
+          </Link>
           <Link href={`/segments/${segment.slug}/settings`} className="btn">
             Settings
           </Link>
@@ -150,6 +145,40 @@ export default function QueueView({
           <div className="label">Total contacts</div>
         </div>
       </div>
+
+      {topToday.length > 0 && (
+        <div className="top-ten">
+          <div className="top-ten-header">
+            <h2>
+              🎯 Today&apos;s Top {topToday.length}
+              <span className="top-ten-sub">Highest-priority overdue &amp; due-today contacts</span>
+            </h2>
+            <button className="btn" onClick={() => setShowTopTen((v) => !v)}>
+              {showTopTen ? "Hide" : "Show"}
+            </button>
+          </div>
+          {showTopTen && (
+            <div className="queue">
+              {topToday.map((c, idx) => (
+                <ContactCard
+                  key={c.id}
+                  contact={c}
+                  rank={idx + 1}
+                  stages={stages}
+                  expanded={expandedId === c.id}
+                  onToggleExpand={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                  onEdit={() => {
+                    setModalMode("edit");
+                    setEditingContact(c);
+                  }}
+                  onDelete={() => handleDelete(c.id)}
+                  onMarkContacted={() => handleMarkContacted(c.id, c.name)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="controls">
         <input
@@ -203,60 +232,22 @@ export default function QueueView({
       </div>
 
       <div className="queue">
-        {contacts.map((c, idx) => {
-          const tl = tierLetter(c.tier?.label);
-          const isExpanded = expandedId === c.id;
-          return (
-            <div key={c.id} className={`card status-${c.status}`}>
-              <div className="rank">{idx + 1}</div>
-              <div className="who">
-                <div className="name-line">
-                  <button className="name" onClick={() => setExpandedId(isExpanded ? null : c.id)}>
-                    {c.name}
-                  </button>
-                  <span className={`tier-badge tier-${tl}`}>{c.tier?.label ?? "—"}</span>
-                </div>
-                <div className="meta">
-                  <b>{c.role || "Unknown role"}</b> · {c.brand || ""}
-                  {c.subBrand ? ` · ${c.subBrand}` : ""}
-                </div>
-                {isExpanded && <HistoryPanel contactId={c.id} stages={stages} />}
-              </div>
-              <div className="stage-pill">{c.stage?.name ?? "—"}</div>
-              <div className="due-info">
-                <div className="rel">{relTime(c.dueAt)}</div>
-                <div className="score">priority {c.priorityScore.toFixed(1)}</div>
-              </div>
-              <div className="actions">
-                {c.linkedin && (
-                  <a href={c.linkedin} target="_blank" rel="noreferrer" title="Open LinkedIn">
-                    in
-                  </a>
-                )}
-                {c.email && (
-                  <a href={`mailto:${c.email}`} title="Email">
-                    ✉
-                  </a>
-                )}
-                <button
-                  title="Edit"
-                  onClick={() => {
-                    setModalMode("edit");
-                    setEditingContact(c);
-                  }}
-                >
-                  ✎
-                </button>
-                <button title="Delete" onClick={() => handleDelete(c.id)}>
-                  ×
-                </button>
-                <button className="contacted" onClick={() => handleMarkContacted(c.id, c.name)}>
-                  Mark contacted
-                </button>
-              </div>
-            </div>
-          );
-        })}
+        {contacts.map((c, idx) => (
+          <ContactCard
+            key={c.id}
+            contact={c}
+            rank={idx + 1}
+            stages={stages}
+            expanded={expandedId === c.id}
+            onToggleExpand={() => setExpandedId(expandedId === c.id ? null : c.id)}
+            onEdit={() => {
+              setModalMode("edit");
+              setEditingContact(c);
+            }}
+            onDelete={() => handleDelete(c.id)}
+            onMarkContacted={() => handleMarkContacted(c.id, c.name)}
+          />
+        ))}
       </div>
       {contacts.length === 0 && <div className="empty">Nothing matches these filters — try widening them.</div>}
 

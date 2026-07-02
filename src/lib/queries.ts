@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw sqlite rows are untyped */
 import { getDb } from "./db";
 import { classify, computePriority } from "./priority";
-import type { Contact, OutreachEvent, Segment, Stage, Tier } from "./types";
+import type { Contact, GridContact, OutreachEvent, Segment, Stage, Tier } from "./types";
 
 function toSegment(row: any): Segment {
   return { id: row.id, name: row.name, slug: row.slug, createdAt: row.created_at };
@@ -46,6 +46,7 @@ function toContact(row: any, now: Date): Contact {
     lastContactedAt: row.last_contacted_at,
     dueAt: row.due_at,
     priorityScore: row.priority_score,
+    promptContext: row.prompt_context,
     archived: !!row.archived,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -81,26 +82,49 @@ export function createSegment(name: string, slug: string): Segment {
   const info = db.prepare("INSERT INTO segments (name, slug) VALUES (?, ?)").run(name, slug);
   const id = Number(info.lastInsertRowid);
 
-  const defaultTiers = [
-    { letter: "A", label: "A Tier", weight: 1.0 },
-    { letter: "B", label: "B Tier", weight: 0.75 },
-    { letter: "C", label: "C Tier", weight: 0.5 },
-    { letter: "D", label: "D Tier", weight: 0.35 },
-  ];
   const tierStmt = db.prepare("INSERT INTO tiers (segment_id, letter, label, weight, sort_order) VALUES (?, ?, ?, ?, ?)");
-  defaultTiers.forEach((t, i) => tierStmt.run(id, t.letter, t.label, t.weight, i));
+  DEFAULT_TIERS.forEach((t, i) => tierStmt.run(id, t.letter, t.label, t.weight, i));
 
-  const defaultStages = [
-    { name: "LinkedIn Add", intervalDays: 0, weight: 0.0035, isTerminal: false },
-    { name: "First Reach", intervalDays: 8, weight: 0.009, isTerminal: false },
-    { name: "Second Reach", intervalDays: 16, weight: 0.013, isTerminal: false },
-    { name: "Third Reach", intervalDays: 34, weight: 0.019, isTerminal: true },
-  ];
   const stageStmt = db.prepare("INSERT INTO stages (segment_id, name, sort_order, interval_days, weight, is_terminal) VALUES (?, ?, ?, ?, ?, ?)");
-  defaultStages.forEach((s, i) => stageStmt.run(id, s.name, i, s.intervalDays, s.weight, s.isTerminal ? 1 : 0));
+  DEFAULT_STAGES.forEach((s, i) => stageStmt.run(id, s.name, i, s.intervalDays, s.weight, s.isTerminal ? 1 : 0));
 
   return getSegmentBySlug(slug)!;
 }
+
+export function deleteSegment(id: number): void {
+  const db = getDb();
+  db.prepare("DELETE FROM segments WHERE id = ?").run(id);
+}
+
+// Real tier/stage pipeline sourced from Enchant's outreach spreadsheet.
+export const DEFAULT_TIERS = [
+  { letter: "S", label: "S Tier", weight: 5 },
+  { letter: "A", label: "A Tier", weight: 4 },
+  { letter: "B", label: "B Tier", weight: 3 },
+  { letter: "C", label: "C Tier", weight: 2 },
+  { letter: "D", label: "D Tier", weight: 1 },
+];
+
+const STAGE_SCALE = 0.001;
+export const DEFAULT_STAGES = [
+  { name: "LinkedIn Add", intervalDays: 0, weight: 1 * STAGE_SCALE, isTerminal: false },
+  { name: "First Reach", intervalDays: 7, weight: 2 * STAGE_SCALE, isTerminal: false },
+  { name: "Second Reach", intervalDays: 14, weight: 3 * STAGE_SCALE, isTerminal: false },
+  { name: "Third Reach", intervalDays: 28, weight: 4 * STAGE_SCALE, isTerminal: false },
+  { name: "Fourth Reach", intervalDays: 60, weight: 5 * STAGE_SCALE, isTerminal: false },
+  { name: "Fifth Reach", intervalDays: 120, weight: 6 * STAGE_SCALE, isTerminal: false },
+  { name: "Meeting One", intervalDays: 30, weight: 7 * STAGE_SCALE, isTerminal: false },
+  { name: "Meeting Two", intervalDays: 14, weight: 10 * STAGE_SCALE, isTerminal: false },
+  { name: "Meeting Three", intervalDays: 60, weight: 9 * STAGE_SCALE, isTerminal: false },
+  { name: "Meeting Four", intervalDays: 14, weight: 13 * STAGE_SCALE, isTerminal: false },
+  { name: "Post-Meeting One", intervalDays: 30, weight: 11 * STAGE_SCALE, isTerminal: false },
+  { name: "Post-Meeting Two", intervalDays: 14, weight: 15 * STAGE_SCALE, isTerminal: false },
+  { name: "Post-Meeting Three", intervalDays: 60, weight: 13 * STAGE_SCALE, isTerminal: false },
+  { name: "Post-Meeting Four", intervalDays: 14, weight: 17 * STAGE_SCALE, isTerminal: false },
+  { name: "Long Check", intervalDays: 700, weight: 10 * STAGE_SCALE, isTerminal: false },
+  { name: "Check In", intervalDays: 365, weight: 15 * STAGE_SCALE, isTerminal: false },
+  { name: "Check Follow", intervalDays: 14, weight: 16 * STAGE_SCALE, isTerminal: true },
+];
 
 export function getTiers(segmentId: number): Tier[] {
   const db = getDb();
@@ -206,6 +230,94 @@ export function listContacts(filters: ContactFilters): Contact[] {
   return contacts;
 }
 
+const GRID_SORT_COLUMNS: Record<string, string> = {
+  name: "c.name",
+  brand: "c.brand",
+  role: "c.role",
+  followers: "c.followers",
+  tier: "t.weight",
+  stage: "s.sort_order",
+  priority: "c.priority_score",
+  due: "c.due_at",
+  segment: "seg.name",
+};
+
+export interface GridFilters {
+  segmentSlug?: string;
+  tierLetter?: string;
+  search?: string;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+export interface GridResult {
+  rows: GridContact[];
+  total: number;
+}
+
+export function listAllContacts(filters: GridFilters): GridResult {
+  const db = getDb();
+  const now = new Date();
+  const clauses = ["c.archived = 0"];
+  const params: any[] = [];
+
+  if (filters.segmentSlug) {
+    clauses.push("seg.slug = ?");
+    params.push(filters.segmentSlug);
+  }
+  if (filters.tierLetter) {
+    clauses.push("t.letter = ?");
+    params.push(filters.tierLetter);
+  }
+  if (filters.search) {
+    clauses.push("(lower(c.name) LIKE ? OR lower(c.brand) LIKE ? OR lower(c.sub_brand) LIKE ? OR lower(c.role) LIKE ? OR lower(c.email) LIKE ?)");
+    const like = `%${filters.search.toLowerCase()}%`;
+    params.push(like, like, like, like, like);
+  }
+
+  const where = clauses.join(" AND ");
+  const sortColumn = GRID_SORT_COLUMNS[filters.sortBy ?? "priority"] ?? GRID_SORT_COLUMNS.priority;
+  const sortDir = filters.sortDir === "asc" ? "ASC" : "DESC";
+  const pageSize = Math.min(Math.max(filters.pageSize ?? 100, 1), 500);
+  const page = Math.max(filters.page ?? 1, 1);
+  const offset = (page - 1) * pageSize;
+
+  const totalRow = db
+    .prepare(
+      `SELECT COUNT(*) as n FROM contacts c
+       JOIN segments seg ON seg.id = c.segment_id
+       LEFT JOIN tiers t ON t.id = c.tier_id
+       LEFT JOIN stages s ON s.id = c.stage_id
+       WHERE ${where}`
+    )
+    .get(...params) as any;
+
+  const rows = db
+    .prepare(
+      `SELECT c.*, seg.name as segment_name, seg.slug as segment_slug,
+        t.id as tier_id_j, t.letter as tier_letter, t.label as tier_label, t.weight as tier_weight, t.sort_order as tier_sort_order,
+        s.id as stage_id_j, s.name as stage_name, s.sort_order as stage_sort_order, s.interval_days as stage_interval_days, s.weight as stage_weight, s.is_terminal as stage_is_terminal
+       FROM contacts c
+       JOIN segments seg ON seg.id = c.segment_id
+       LEFT JOIN tiers t ON t.id = c.tier_id
+       LEFT JOIN stages s ON s.id = c.stage_id
+       WHERE ${where}
+       ORDER BY ${sortColumn} ${sortDir}
+       LIMIT ? OFFSET ?`
+    )
+    .all(...params, pageSize, offset);
+
+  const gridRows: GridContact[] = rows.map((r: any) => ({
+    ...toContact(r, now),
+    segmentName: r.segment_name,
+    segmentSlug: r.segment_slug,
+  }));
+
+  return { rows: gridRows, total: totalRow.n };
+}
+
 export function getContact(id: number): Contact | null {
   const db = getDb();
   const row = db.prepare(`${CONTACT_SELECT} WHERE c.id = ?`).get(id);
@@ -236,6 +348,14 @@ export function getStats(segmentId: number): ContactStats {
   };
 }
 
+export function getTopToday(segmentId: number, limit = 10): Contact[] {
+  const db = getDb();
+  const now = new Date();
+  const rows = db.prepare(`${CONTACT_SELECT} WHERE c.segment_id = ? AND c.archived = 0 ORDER BY c.priority_score DESC`).all(segmentId);
+  const contacts = rows.map((r) => toContact(r, now));
+  return contacts.filter((c) => c.status === "overdue" || c.status === "today").slice(0, limit);
+}
+
 export interface NewContactInput {
   segmentId: number;
   tierId?: number | null;
@@ -249,6 +369,7 @@ export interface NewContactInput {
   email?: string | null;
   lastContactedAt?: string | null;
   dueAt?: string | null;
+  promptContext?: string | null;
 }
 
 function priorityForContact(db: ReturnType<typeof getDb>, tierId: number | null, stageId: number | null, followers: number | null): number {
@@ -267,8 +388,8 @@ export function createContact(input: NewContactInput): Contact {
 
   const info = db
     .prepare(
-      `INSERT INTO contacts (segment_id, tier_id, stage_id, brand, sub_brand, name, role, followers, linkedin, email, last_contacted_at, due_at, priority_score)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO contacts (segment_id, tier_id, stage_id, brand, sub_brand, name, role, followers, linkedin, email, last_contacted_at, due_at, priority_score, prompt_context)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       input.segmentId,
@@ -283,7 +404,8 @@ export function createContact(input: NewContactInput): Contact {
       input.email ?? null,
       input.lastContactedAt ?? null,
       dueAt,
-      priority
+      priority,
+      input.promptContext ?? null
     );
   return getContact(Number(info.lastInsertRowid))!;
 }

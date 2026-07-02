@@ -39,12 +39,18 @@ export interface Contact {
   lastContactedAt: string | null;
   dueAt: string | null;
   priorityScore: number;
+  promptContext: string | null;
   archived: boolean;
   createdAt: string;
   updatedAt: string;
   tier?: Tier | null;
   stage?: Stage | null;
   status: "overdue" | "today" | "upcoming" | "none";
+}
+
+export interface GridContact extends Contact {
+  segmentName: string;
+  segmentSlug: string;
 }
 
 export interface OutreachEvent {
