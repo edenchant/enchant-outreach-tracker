@@ -682,8 +682,19 @@ select {
   min-width: 90px;
 }
 
-.data-grid-table tr.editing-row {
+.data-grid-table tbody tr:focus-within {
   background: var(--accent-soft);
+}
+
+.data-grid-table input:invalid,
+.data-grid-table input.save-error {
+  border-color: var(--overdue);
+}
+
+.saving-indicator {
+  font-size: 11px;
+  color: var(--ink-soft);
+  font-family: var(--mono);
 }
 
 .data-grid-actions {

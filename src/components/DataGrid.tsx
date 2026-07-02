@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { GridContact } from "@/lib/types";
+import type { ContactPayload } from "@/lib/api-client";
 import type { Segment, Stage, Tier } from "@/lib/types";
 import {
   deleteContact as apiDeleteContact,
@@ -10,18 +11,6 @@ import {
   fetchSegmentConfig,
   updateContact as apiUpdateContact,
 } from "@/lib/api-client";
-
-type EditDraft = {
-  tierId: string;
-  stageId: string;
-  brand: string;
-  subBrand: string;
-  name: string;
-  role: string;
-  followers: string;
-  linkedin: string;
-  email: string;
-};
 
 const TIER_LETTERS = ["S", "A", "B", "C", "D"];
 
@@ -43,11 +32,11 @@ export default function DataGrid({
   const [tierFilter, setTierFilter] = useState("");
   const [sortBy, setSortBy] = useState("priority");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [draft, setDraft] = useState<EditDraft | null>(null);
-  const [saving, setSaving] = useState(false);
   const [configCache, setConfigCache] = useState<Record<string, { tiers: Tier[]; stages: Stage[] }>>({});
+  const [pendingSaves, setPendingSaves] = useState(0);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function refresh() {
     const result = await fetchGrid({
@@ -72,6 +61,23 @@ export default function DataGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, segmentFilter, tierFilter, sortBy, sortDir, page]);
 
+  // Tier/stage dropdowns differ per segment, so preload config for every
+  // segment currently on screen (rather than fetching on demand per cell).
+  useEffect(() => {
+    const slugs = Array.from(new Set(rows.map((r) => r.segmentSlug)));
+    const missing = slugs.filter((s) => !configCache[s]);
+    if (missing.length === 0) return;
+    (async () => {
+      const entries = await Promise.all(missing.map(async (slug) => [slug, await fetchSegmentConfig(slug)] as const));
+      setConfigCache((prev) => {
+        const next = { ...prev };
+        for (const [slug, cfg] of entries) next[slug] = { tiers: cfg.tiers, stages: cfg.stages };
+        return next;
+      });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
+
   function toggleSort(col: string) {
     if (sortBy === col) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -81,50 +87,17 @@ export default function DataGrid({
     }
   }
 
-  async function startEdit(row: GridContact) {
-    if (!configCache[row.segmentSlug]) {
-      const cfg = await fetchSegmentConfig(row.segmentSlug);
-      setConfigCache((prev) => ({ ...prev, [row.segmentSlug]: { tiers: cfg.tiers, stages: cfg.stages } }));
-    }
-    setEditingId(row.id);
-    setDraft({
-      tierId: row.tierId ? String(row.tierId) : "",
-      stageId: row.stageId ? String(row.stageId) : "",
-      brand: row.brand ?? "",
-      subBrand: row.subBrand ?? "",
-      name: row.name,
-      role: row.role ?? "",
-      followers: row.followers != null ? String(row.followers) : "",
-      linkedin: row.linkedin ?? "",
-      email: row.email ?? "",
-    });
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setDraft(null);
-  }
-
-  async function saveEdit(id: number) {
-    if (!draft) return;
-    setSaving(true);
+  async function saveField(row: GridContact, patch: Partial<ContactPayload>) {
+    setPendingSaves((n) => n + 1);
     try {
-      await apiUpdateContact(id, {
-        tierId: draft.tierId ? Number(draft.tierId) : null,
-        stageId: draft.stageId ? Number(draft.stageId) : null,
-        brand: draft.brand.trim() || null,
-        subBrand: draft.subBrand.trim() || null,
-        name: draft.name.trim(),
-        role: draft.role.trim() || null,
-        followers: draft.followers.trim() ? Number(draft.followers) : null,
-        linkedin: draft.linkedin.trim() || null,
-        email: draft.email.trim() || null,
-      });
-      setEditingId(null);
-      setDraft(null);
-      await refresh();
+      const updated = await apiUpdateContact(row.id, patch);
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, ...updated } : r)));
+    } catch (e) {
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+      setSaveError(`Couldn't save ${row.name}: ${(e as Error).message}`);
+      errorTimeoutRef.current = setTimeout(() => setSaveError(null), 6000);
     } finally {
-      setSaving(false);
+      setPendingSaves((n) => n - 1);
     }
   }
 
@@ -197,7 +170,10 @@ export default function DataGrid({
           ))}
         </select>
         <div className="grid-count">{total.toLocaleString()} contacts</div>
+        {pendingSaves > 0 && <div className="saving-indicator">Saving…</div>}
       </div>
+
+      {saveError && <div className="error-text">{saveError}</div>}
 
       <div className="data-grid-scroll">
         <table className="settings-table data-grid-table">
@@ -238,87 +214,118 @@ export default function DataGrid({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const isEditing = editingId === row.id;
               const cfg = configCache[row.segmentSlug];
+              const rowKey = `${row.id}-${row.updatedAt}`;
               return (
-                <tr key={row.id} className={isEditing ? "editing-row" : ""}>
+                <tr key={rowKey}>
                   <td>{row.segmentName}</td>
                   <td>
-                    {isEditing && draft && cfg ? (
-                      <select value={draft.tierId} onChange={(e) => setDraft({ ...draft, tierId: e.target.value })}>
-                        <option value="">—</option>
-                        {cfg.tiers.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      row.tier?.label ?? "—"
-                    )}
-                  </td>
-                  <td>{isEditing && draft ? <input value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} /> : row.brand ?? ""}</td>
-                  <td>{isEditing && draft ? <input value={draft.subBrand} onChange={(e) => setDraft({ ...draft, subBrand: e.target.value })} /> : row.subBrand ?? ""}</td>
-                  <td>{isEditing && draft ? <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /> : row.name}</td>
-                  <td>{isEditing && draft ? <input value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value })} /> : row.role ?? ""}</td>
-                  <td>
-                    {isEditing && draft ? (
-                      <input type="number" min="0" value={draft.followers} onChange={(e) => setDraft({ ...draft, followers: e.target.value })} />
-                    ) : (
-                      row.followers?.toLocaleString() ?? ""
-                    )}
+                    <select
+                      defaultValue={row.tierId ? String(row.tierId) : ""}
+                      disabled={!cfg}
+                      onChange={(e) => saveField(row, { tierId: e.target.value ? Number(e.target.value) : null })}
+                    >
+                      <option value="">—</option>
+                      {(cfg?.tiers ?? []).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td>
-                    {isEditing && draft && cfg ? (
-                      <select value={draft.stageId} onChange={(e) => setDraft({ ...draft, stageId: e.target.value })}>
-                        <option value="">—</option>
-                        {cfg.stages.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      row.stage?.name ?? "—"
-                    )}
+                    <input
+                      defaultValue={row.brand ?? ""}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim() || null;
+                        if (val !== (row.brand ?? null)) saveField(row, { brand: val });
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      defaultValue={row.subBrand ?? ""}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim() || null;
+                        if (val !== (row.subBrand ?? null)) saveField(row, { subBrand: val });
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      defaultValue={row.name}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim();
+                        if (!val) {
+                          e.target.value = row.name;
+                          return;
+                        }
+                        if (val !== row.name) saveField(row, { name: val });
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      defaultValue={row.role ?? ""}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim() || null;
+                        if (val !== (row.role ?? null)) saveField(row, { role: val });
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      defaultValue={row.followers != null ? String(row.followers) : ""}
+                      onBlur={(e) => {
+                        const raw = e.target.value.trim();
+                        const val = raw ? Number(raw) : null;
+                        if (val !== row.followers) saveField(row, { followers: val });
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <select
+                      defaultValue={row.stageId ? String(row.stageId) : ""}
+                      disabled={!cfg}
+                      onChange={(e) => saveField(row, { stageId: e.target.value ? Number(e.target.value) : null })}
+                    >
+                      <option value="">—</option>
+                      {(cfg?.stages ?? []).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td>{row.dueAt ? new Date(row.dueAt).toLocaleDateString("en-GB") : "—"}</td>
                   <td title={row.brandBonus ? `Boosted from base ${row.priorityScore.toFixed(1)} — ${row.brandBonus.eventType}, ${row.brandBonus.daysAgo}d ago` : undefined}>
                     {row.effectivePriorityScore.toFixed(1)}
                     {row.brandBonus ? " 📰" : ""}
                   </td>
-                  <td>{isEditing && draft ? <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /> : row.email ?? ""}</td>
                   <td>
-                    {isEditing && draft ? (
-                      <input value={draft.linkedin} onChange={(e) => setDraft({ ...draft, linkedin: e.target.value })} />
-                    ) : row.linkedin ? (
-                      <a href={row.linkedin} target="_blank" rel="noreferrer">
-                        in
-                      </a>
-                    ) : (
-                      ""
-                    )}
+                    <input
+                      defaultValue={row.email ?? ""}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim() || null;
+                        if (val !== (row.email ?? null)) saveField(row, { email: val });
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      defaultValue={row.linkedin ?? ""}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim() || null;
+                        if (val !== (row.linkedin ?? null)) saveField(row, { linkedin: val });
+                      }}
+                    />
                   </td>
                   <td className="data-grid-actions">
-                    {isEditing ? (
-                      <>
-                        <button className="btn" disabled={saving} onClick={() => saveEdit(row.id)}>
-                          {saving ? "…" : "Save"}
-                        </button>
-                        <button className="btn" onClick={cancelEdit}>
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button className="btn" onClick={() => startEdit(row)}>
-                          Edit
-                        </button>
-                        <button className="btn" onClick={() => handleDelete(row.id)}>
-                          Delete
-                        </button>
-                      </>
-                    )}
+                    <button className="btn" onClick={() => handleDelete(row.id)}>
+                      Delete
+                    </button>
                   </td>
                 </tr>
               );
