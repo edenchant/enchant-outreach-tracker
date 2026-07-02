@@ -61,5 +61,6 @@ export interface OutreachEvent {
   prevDueAt: string | null;
   prevLastContactedAt: string | null;
   prevPriorityScore: number | null;
+  type: "contacted" | "snoozed";
   contactedAt: string;
 }

@@ -40,8 +40,26 @@ export async function fetchTopToday(slug: string): Promise<Contact[]> {
   return data.contacts;
 }
 
+export async function fetchGlobalStats() {
+  const res = await fetch(`/api/stats`);
+  const data = await json<{ stats: { overdue: number; today: number; upcoming: number; total: number } }>(res);
+  return data.stats;
+}
+
+export async function fetchGlobalTopToday(): Promise<GridContact[]> {
+  const res = await fetch(`/api/top10`);
+  const data = await json<{ contacts: GridContact[] }>(res);
+  return data.contacts;
+}
+
 export async function markContacted(id: number): Promise<Contact> {
   const res = await fetch(`/api/contacts/${id}/contact`, { method: "POST" });
+  const data = await json<{ contact: Contact }>(res);
+  return data.contact;
+}
+
+export async function snoozeContact(id: number): Promise<Contact> {
+  const res = await fetch(`/api/contacts/${id}/snooze`, { method: "POST" });
   const data = await json<{ contact: Contact }>(res);
   return data.contact;
 }
@@ -105,6 +123,7 @@ export interface OutreachEventDTO {
   contactedAt: string;
   fromStageId: number | null;
   toStageId: number | null;
+  type: "contacted" | "snoozed";
 }
 
 export async function fetchHistory(id: number): Promise<OutreachEventDTO[]> {

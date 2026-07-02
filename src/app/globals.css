@@ -1,28 +1,30 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #fbf8f2;
+  --bg: #e9f2fb;
   --panel: #ffffff;
-  --ink: #1d2321;
-  --ink-soft: #6b6f64;
-  --line: #ece7d9;
-  --accent: #1baf7a;
-  --accent-ink: #0a6b48;
-  --accent-soft: #e1f6ec;
+  --ink: #122436;
+  --ink-soft: #4d6a86;
+  --line: #c9dcf0;
+  --accent: #2a78d6;
+  --accent-ink: #1c5cab;
+  --accent-soft: #dbeafc;
   --overdue: #d03b3b;
   --overdue-soft: #fbe6e6;
   --due-today: #c9860a;
   --due-today-soft: #fdf0d9;
   --upcoming: #2a78d6;
-  --upcoming-soft: #e5f0fc;
-  --tier-a: #b8790a;
+  --upcoming-soft: #dbeafc;
+  --tier-s: #4a3aa7;
+  --tier-s-soft: #e8e5f7;
+  --tier-a: #9c6208;
   --tier-a-soft: #fdf0d9;
   --tier-b: #0a6b48;
   --tier-b-soft: #e1f6ec;
-  --tier-c: #1c5cab;
-  --tier-c-soft: #e5f0fc;
-  --tier-d: #6b6f64;
-  --tier-d-soft: #efece2;
+  --tier-c: #a83a6b;
+  --tier-c-soft: #f8e6ef;
+  --tier-d: #5c6f80;
+  --tier-d-soft: #e6edf3;
   --mono: var(--font-jetbrains-mono), "SF Mono", Consolas, monospace;
   --sans: var(--font-nunito), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -318,6 +320,11 @@ select {
   letter-spacing: 0.02em;
 }
 
+.tier-S {
+  background: var(--tier-s-soft);
+  color: var(--tier-s);
+}
+
 .tier-A {
   background: var(--tier-a-soft);
   color: var(--tier-a);
@@ -336,6 +343,17 @@ select {
 .tier-D {
   background: var(--tier-d-soft);
   color: var(--tier-d);
+}
+
+.segment-pill {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1.5px 6px;
+  border-radius: 20px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--line);
+  color: var(--ink-soft);
 }
 
 .who .meta {

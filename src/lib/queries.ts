@@ -356,6 +356,45 @@ export function getTopToday(segmentId: number, limit = 10): Contact[] {
   return contacts.filter((c) => c.status === "overdue" || c.status === "today").slice(0, limit);
 }
 
+const GLOBAL_CONTACT_SELECT = `
+  SELECT c.*, seg.name as segment_name, seg.slug as segment_slug,
+    t.id as tier_id_j, t.letter as tier_letter, t.label as tier_label, t.weight as tier_weight, t.sort_order as tier_sort_order,
+    s.id as stage_id_j, s.name as stage_name, s.sort_order as stage_sort_order, s.interval_days as stage_interval_days, s.weight as stage_weight, s.is_terminal as stage_is_terminal
+  FROM contacts c
+  JOIN segments seg ON seg.id = c.segment_id
+  LEFT JOIN tiers t ON t.id = c.tier_id
+  LEFT JOIN stages s ON s.id = c.stage_id
+`;
+
+export function getGlobalStats(): ContactStats {
+  const db = getDb();
+  const now = new Date();
+  const rows = db.prepare(`${CONTACT_SELECT} WHERE c.archived = 0`).all();
+  const contacts = rows.map((r) => toContact(r, now));
+  return {
+    overdue: contacts.filter((c) => c.status === "overdue").length,
+    today: contacts.filter((c) => c.status === "today").length,
+    upcoming: contacts.filter((c) => {
+      if (!c.dueAt) return false;
+      const diff = (new Date(c.dueAt).getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+      return diff >= 1 && diff <= 7;
+    }).length,
+    total: contacts.length,
+  };
+}
+
+export function getGlobalTopToday(limit = 10): GridContact[] {
+  const db = getDb();
+  const now = new Date();
+  const rows = db.prepare(`${GLOBAL_CONTACT_SELECT} WHERE c.archived = 0 ORDER BY c.priority_score DESC`).all();
+  const contacts: GridContact[] = rows.map((r: any) => ({
+    ...toContact(r, now),
+    segmentName: r.segment_name,
+    segmentSlug: r.segment_slug,
+  }));
+  return contacts.filter((c) => c.status === "overdue" || c.status === "today").slice(0, limit);
+}
+
 export interface NewContactInput {
   segmentId: number;
   tierId?: number | null;
@@ -468,12 +507,29 @@ export function markContacted(id: number): Contact {
   const newPriority = computePriority(current.followers, tierWeight, toStage?.weight ?? 0);
 
   db.prepare(
-    "INSERT INTO outreach_events (contact_id, from_stage_id, to_stage_id, prev_due_at, prev_last_contacted_at, prev_priority_score) VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT INTO outreach_events (contact_id, from_stage_id, to_stage_id, prev_due_at, prev_last_contacted_at, prev_priority_score, type) VALUES (?, ?, ?, ?, ?, ?, 'contacted')"
   ).run(id, current.stage_id, toStage?.id ?? null, current.due_at, current.last_contacted_at, current.priority_score);
 
   db.prepare(
     "UPDATE contacts SET stage_id = ?, last_contacted_at = ?, due_at = ?, priority_score = ?, updated_at = datetime('now') WHERE id = ?"
   ).run(toStage?.id ?? null, now.toISOString(), newDueAt, newPriority, id);
+
+  return getContact(id)!;
+}
+
+export function snoozeContact(id: number, days = 30): Contact {
+  const db = getDb();
+  const current = db.prepare("SELECT * FROM contacts WHERE id = ?").get(id) as any;
+  if (!current) throw new Error("Contact not found");
+
+  const now = new Date();
+  const newDueAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+
+  db.prepare(
+    "INSERT INTO outreach_events (contact_id, from_stage_id, to_stage_id, prev_due_at, prev_last_contacted_at, prev_priority_score, type) VALUES (?, ?, ?, ?, ?, ?, 'snoozed')"
+  ).run(id, current.stage_id, current.stage_id, current.due_at, current.last_contacted_at, current.priority_score);
+
+  db.prepare("UPDATE contacts SET due_at = ?, updated_at = datetime('now') WHERE id = ?").run(newDueAt, id);
 
   return getContact(id)!;
 }
@@ -505,6 +561,7 @@ export function getContactHistory(id: number): OutreachEvent[] {
     prevDueAt: r.prev_due_at,
     prevLastContactedAt: r.prev_last_contacted_at,
     prevPriorityScore: r.prev_priority_score,
+    type: r.type,
     contactedAt: r.contacted_at,
   }));
 }

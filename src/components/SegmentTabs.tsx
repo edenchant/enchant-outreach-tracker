@@ -4,6 +4,9 @@ import type { Segment } from "@/lib/types";
 export default function SegmentTabs({ segments, activeSlug }: { segments: Segment[]; activeSlug: string }) {
   return (
     <div className="segment-tabs">
+      <Link href="/" className={activeSlug === "" ? "active" : ""}>
+        All
+      </Link>
       {segments.map((s) => (
         <Link key={s.id} href={`/segments/${s.slug}`} className={s.slug === activeSlug ? "active" : ""}>
           {s.name}

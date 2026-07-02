@@ -26,7 +26,8 @@ export default function HistoryPanel({ contactId, stages }: { contactId: number;
     <div className="history-panel">
       {events.map((e) => (
         <div key={e.id} className="event">
-          {new Date(e.contactedAt).toLocaleString("en-GB")} — {stageName(e.fromStageId)} → {stageName(e.toStageId)}
+          {new Date(e.contactedAt).toLocaleString("en-GB")} —{" "}
+          {e.type === "snoozed" ? `Snoozed (was ${stageName(e.fromStageId)})` : `${stageName(e.fromStageId)} → ${stageName(e.toStageId)}`}
         </div>
       ))}
     </div>

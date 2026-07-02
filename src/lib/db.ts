@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS outreach_events (
   prev_due_at TEXT,
   prev_last_contacted_at TEXT,
   prev_priority_score REAL,
+  type TEXT NOT NULL DEFAULT 'contacted',
   contacted_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -76,10 +77,16 @@ CREATE INDEX IF NOT EXISTS idx_events_contact ON outreach_events(contact_id);
 `;
 
 function migrate(db: DatabaseSync) {
-  const columns = db.prepare("PRAGMA table_info(contacts)").all() as Array<{ name: string }>;
-  const hasPromptContext = columns.some((c) => c.name === "prompt_context");
+  const contactColumns = db.prepare("PRAGMA table_info(contacts)").all() as Array<{ name: string }>;
+  const hasPromptContext = contactColumns.some((c) => c.name === "prompt_context");
   if (!hasPromptContext) {
     db.exec("ALTER TABLE contacts ADD COLUMN prompt_context TEXT;");
+  }
+
+  const eventColumns = db.prepare("PRAGMA table_info(outreach_events)").all() as Array<{ name: string }>;
+  const hasType = eventColumns.some((c) => c.name === "type");
+  if (!hasType) {
+    db.exec("ALTER TABLE outreach_events ADD COLUMN type TEXT NOT NULL DEFAULT 'contacted';");
   }
 }
 

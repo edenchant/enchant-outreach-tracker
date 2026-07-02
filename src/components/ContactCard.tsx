@@ -28,6 +28,8 @@ export default function ContactCard({
   onDelete,
   onMarkContacted,
   onDraft,
+  onSnooze,
+  segmentLabel,
 }: {
   contact: Contact;
   rank: number;
@@ -38,6 +40,8 @@ export default function ContactCard({
   onDelete: () => void;
   onMarkContacted: () => void;
   onDraft: () => void;
+  onSnooze: () => void;
+  segmentLabel?: string;
 }) {
   const tl = tierLetter(c.tier?.label);
 
@@ -50,6 +54,7 @@ export default function ContactCard({
             {c.name}
           </button>
           <span className={`tier-badge tier-${tl}`}>{c.tier?.label ?? "—"}</span>
+          {segmentLabel && <span className="segment-pill">{segmentLabel}</span>}
         </div>
         <div className="meta">
           <b>{c.role || "Unknown role"}</b> · {c.brand || ""}
@@ -84,6 +89,9 @@ export default function ContactCard({
         )}
         <button title="Draft a message" onClick={onDraft}>
           ✨
+        </button>
+        <button title="Snooze 30 days" onClick={onSnooze}>
+          💤
         </button>
         <button title="Edit" onClick={onEdit}>
           ✎

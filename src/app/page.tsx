@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { listSegments } from "@/lib/queries";
+import { getGlobalStats, getGlobalTopToday, listSegments } from "@/lib/queries";
+import GlobalHome from "@/components/GlobalHome";
 
 export const dynamic = "force-dynamic";
 
@@ -8,5 +9,9 @@ export default function Home() {
   if (segments.length === 0) {
     redirect("/segments/new");
   }
-  redirect(`/segments/${segments[0].slug}`);
+
+  const stats = getGlobalStats();
+  const topToday = getGlobalTopToday(10);
+
+  return <GlobalHome segments={segments} initialStats={stats} initialTopToday={topToday} />;
 }

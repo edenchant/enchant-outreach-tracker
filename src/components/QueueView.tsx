@@ -8,6 +8,7 @@ import {
   fetchStats,
   fetchTopToday,
   markContacted as apiMarkContacted,
+  snoozeContact as apiSnoozeContact,
   undoContact as apiUndoContact,
 } from "@/lib/api-client";
 import Link from "next/link";
@@ -49,7 +50,7 @@ export default function QueueView({
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [modalMode, setModalMode] = useState<"add" | "edit" | null>(null);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [toast, setToast] = useState<{ id: number; name: string } | null>(null);
+  const [toast, setToast] = useState<{ id: number; name: string; action: "contacted" | "snoozed" } | null>(null);
   const [topToday, setTopToday] = useState<Contact[]>(initialTopToday);
   const [showTopTen, setShowTopTen] = useState(true);
   const [draftingContact, setDraftingContact] = useState<Contact | null>(null);
@@ -79,7 +80,13 @@ export default function QueueView({
 
   async function handleMarkContacted(id: number, name: string) {
     await apiMarkContacted(id);
-    setToast({ id, name });
+    setToast({ id, name, action: "contacted" });
+    await refresh();
+  }
+
+  async function handleSnooze(id: number, name: string) {
+    await apiSnoozeContact(id);
+    setToast({ id, name, action: "snoozed" });
     await refresh();
   }
 
@@ -122,7 +129,15 @@ export default function QueueView({
 
       {toast && (
         <div className="history-panel" style={{ marginBottom: 14 }}>
-          Marked <b>{toast.name}</b> as contacted.{" "}
+          {toast.action === "contacted" ? (
+            <>
+              Marked <b>{toast.name}</b> as contacted.
+            </>
+          ) : (
+            <>
+              Snoozed <b>{toast.name}</b> for 30 days.
+            </>
+          )}{" "}
           <button className="btn" style={{ marginLeft: 8 }} onClick={() => handleUndo(toast.id)}>
             Undo
           </button>
@@ -175,6 +190,7 @@ export default function QueueView({
                   }}
                   onDelete={() => handleDelete(c.id)}
                   onMarkContacted={() => handleMarkContacted(c.id, c.name)}
+                  onSnooze={() => handleSnooze(c.id, c.name)}
                   onDraft={() => setDraftingContact(c)}
                 />
               ))}
@@ -249,6 +265,7 @@ export default function QueueView({
             }}
             onDelete={() => handleDelete(c.id)}
             onMarkContacted={() => handleMarkContacted(c.id, c.name)}
+            onSnooze={() => handleSnooze(c.id, c.name)}
             onDraft={() => setDraftingContact(c)}
           />
         ))}
