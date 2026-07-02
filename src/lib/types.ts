@@ -1,0 +1,59 @@
+export interface Segment {
+  id: number;
+  name: string;
+  slug: string;
+  createdAt: string;
+}
+
+export interface Tier {
+  id: number;
+  segmentId: number;
+  letter: string;
+  label: string;
+  weight: number;
+  sortOrder: number;
+}
+
+export interface Stage {
+  id: number;
+  segmentId: number;
+  name: string;
+  sortOrder: number;
+  intervalDays: number;
+  weight: number;
+  isTerminal: boolean;
+}
+
+export interface Contact {
+  id: number;
+  segmentId: number;
+  tierId: number | null;
+  stageId: number | null;
+  brand: string | null;
+  subBrand: string | null;
+  name: string;
+  role: string | null;
+  followers: number | null;
+  linkedin: string | null;
+  email: string | null;
+  lastContactedAt: string | null;
+  dueAt: string | null;
+  priorityScore: number;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  tier?: Tier | null;
+  stage?: Stage | null;
+  status: "overdue" | "today" | "upcoming" | "none";
+}
+
+export interface OutreachEvent {
+  id: number;
+  contactId: number;
+  fromStageId: number | null;
+  toStageId: number | null;
+  prevDueAt: string | null;
+  prevLastContactedAt: string | null;
+  prevPriorityScore: number | null;
+  contactedAt: string;
+}
