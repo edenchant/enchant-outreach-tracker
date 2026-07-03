@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw sqlite rows are untyped */
+import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { getDb } from "./db";
 import { brandBonusMultiplier, brandBonusSqlExpression, classify, computePriority, daysBetween } from "./priority";
 import type { BrandHistoryEntry, Contact, GridContact, OutreachEvent, Segment, Stage, Tier } from "./types";
@@ -737,7 +738,7 @@ export interface NewBrandHistoryInput {
   eventType: string;
   date: string;
   note?: string | null;
-  source?: "manual" | "news_api";
+  source?: "manual" | "news_api" | "sales_nav_feed";
   articleUrl?: string | null;
   status?: "confirmed" | "pending";
 }
@@ -800,4 +801,38 @@ export function setSetting(key: string, value: string): void {
   db.prepare(
     "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
   ).run(key, value);
+}
+
+// ---- Personal API token (extension auth) ----
+// Only the hash is ever stored — the plaintext is returned once, at
+// generation time, the same convention as GitHub/Stripe API keys.
+
+const API_TOKEN_HASH_KEY = "api_token_hash";
+const API_TOKEN_CREATED_AT_KEY = "api_token_created_at";
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export function generateApiToken(): string {
+  const token = randomBytes(32).toString("hex");
+  setSetting(API_TOKEN_HASH_KEY, hashToken(token));
+  setSetting(API_TOKEN_CREATED_AT_KEY, new Date().toISOString());
+  return token;
+}
+
+export function verifyApiToken(token: string | null | undefined): boolean {
+  if (!token) return false;
+  const storedHash = getSetting(API_TOKEN_HASH_KEY);
+  if (!storedHash) return false;
+  const candidateHash = hashToken(token);
+  const a = Buffer.from(storedHash, "hex");
+  const b = Buffer.from(candidateHash, "hex");
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+export function getApiTokenStatus(): { exists: boolean; createdAt: string | null } {
+  const createdAt = getSetting(API_TOKEN_CREATED_AT_KEY);
+  return { exists: !!getSetting(API_TOKEN_HASH_KEY), createdAt };
 }

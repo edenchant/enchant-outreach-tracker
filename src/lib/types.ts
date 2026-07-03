@@ -62,7 +62,7 @@ export interface BrandHistoryEntry {
   eventType: "New CMO" | "Brand Refresh / Rebrand" | "Major ATL Campaign";
   date: string;
   note: string | null;
-  source: "manual" | "news_api";
+  source: "manual" | "news_api" | "sales_nav_feed";
   articleUrl: string | null;
   status: "confirmed" | "pending";
   createdAt: string;

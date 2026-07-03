@@ -9,6 +9,7 @@ import {
   createBrandHistory,
   dismissBrandHistory,
   fetchBrandHistories,
+  generateApiTokenApi,
   triggerBrandScan,
   type ScanSummaryDTO,
 } from "@/lib/api-client";
@@ -20,6 +21,12 @@ function fmtDate(d: string | null) {
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+  manual: "manual",
+  news_api: "news scan",
+  sales_nav_feed: "Sales Navigator",
+};
+
 function fmtDateTime(d: string | null) {
   if (!d) return "never";
   return new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -28,9 +35,11 @@ function fmtDateTime(d: string | null) {
 export default function BrandHistoriesView({
   initialEntries,
   initialSummary,
+  initialTokenStatus,
 }: {
   initialEntries: BrandHistoryEntry[];
   initialSummary: ScanSummaryDTO;
+  initialTokenStatus: { exists: boolean; createdAt: string | null };
 }) {
   const [entries, setEntries] = useState<BrandHistoryEntry[]>(initialEntries);
   const [brandFilter, setBrandFilter] = useState("");
@@ -41,6 +50,10 @@ export default function BrandHistoriesView({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [draft, setDraft] = useState({ brand: "", eventType: EVENT_TYPES[0], date: new Date().toISOString().slice(0, 10), note: "" });
+  const [tokenStatus, setTokenStatus] = useState(initialTokenStatus);
+  const [newToken, setNewToken] = useState<string | null>(null);
+  const [tokenBusy, setTokenBusy] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   const brandOptions = useMemo(() => {
     const set = new Set(entries.map((e) => e.brand));
@@ -79,6 +92,30 @@ export default function BrandHistoriesView({
     } finally {
       setScanning(false);
     }
+  }
+
+  async function handleGenerateToken() {
+    if (
+      tokenStatus.exists &&
+      !confirm("Generate a new token? The extension will stop working until you paste the new one in.")
+    ) {
+      return;
+    }
+    setTokenBusy(true);
+    setTokenCopied(false);
+    try {
+      const token = await generateApiTokenApi();
+      setNewToken(token);
+      setTokenStatus({ exists: true, createdAt: new Date().toISOString() });
+    } finally {
+      setTokenBusy(false);
+    }
+  }
+
+  async function handleCopyToken() {
+    if (!newToken) return;
+    await navigator.clipboard.writeText(newToken);
+    setTokenCopied(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -204,6 +241,34 @@ export default function BrandHistoriesView({
         </div>
       </div>
 
+      <div className="brand-history-panel">
+        <h2>Sales Navigator capture</h2>
+        <p className="last-scanned" style={{ marginBottom: 14 }}>
+          Lets the browser extension send something you&apos;ve spotted in your Sales Navigator feed straight into
+          this table — see <code>extension/README.md</code> in the repo for install steps. Every capture still goes
+          through an in-page confirm/edit step before it&apos;s sent, so entries land here already confirmed.
+        </p>
+        <p className="last-scanned" style={{ marginBottom: 14 }}>
+          {tokenStatus.exists
+            ? `Token generated ${fmtDateTime(tokenStatus.createdAt)}.`
+            : "No token generated yet — the extension needs one to authenticate."}
+        </p>
+        <button className="btn" disabled={tokenBusy} onClick={handleGenerateToken}>
+          {tokenBusy ? "Generating…" : tokenStatus.exists ? "Generate new token" : "Generate token"}
+        </button>
+        {newToken && (
+          <div className="history-panel" style={{ marginTop: 14 }}>
+            <b>Copy this now — it won&apos;t be shown again.</b> Paste it into the extension&apos;s toolbar popup.
+            <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+              <code style={{ wordBreak: "break-all" }}>{newToken}</code>
+              <button className="btn" onClick={handleCopyToken}>
+                {tokenCopied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="data-grid-scroll">
         <table className="settings-table data-grid-table">
           <thead>
@@ -227,7 +292,7 @@ export default function BrandHistoriesView({
                   <span className={`status-pill ${entry.status}`}>{entry.status}</span>
                 </td>
                 <td>
-                  <span className="source-tag">{entry.source === "manual" ? "manual" : "news scan"}</span>
+                  <span className="source-tag">{SOURCE_LABELS[entry.source] ?? entry.source}</span>
                 </td>
                 <td>
                   {entry.articleUrl ? (

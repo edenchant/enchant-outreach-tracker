@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Enchant Brand Histories Capture",
+  "version": "1.0.0",
+  "description": "Manual, click-triggered capture of Sales Navigator feed items into the Enchant Outreach Tracker's Brand Histories log.",
+  "permissions": ["contextMenus", "storage"],
+  "optional_host_permissions": ["*://*/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/sales/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Enchant Brand Histories — settings"
+  }
+}

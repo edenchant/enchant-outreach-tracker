@@ -250,3 +250,14 @@ export async function triggerBrandScan(): Promise<{ brandsScanned: number; total
   const data = await json<{ result: { brandsScanned: number; totalBrands: number; newEntries: number; errors: string[] } }>(res);
   return data.result;
 }
+
+export async function fetchApiTokenStatus(): Promise<{ exists: boolean; createdAt: string | null }> {
+  const res = await fetch(`/api/settings/api-token`);
+  return json(res);
+}
+
+export async function generateApiTokenApi(): Promise<string> {
+  const res = await fetch(`/api/settings/api-token`, { method: "POST" });
+  const data = await json<{ token: string }>(res);
+  return data.token;
+}
