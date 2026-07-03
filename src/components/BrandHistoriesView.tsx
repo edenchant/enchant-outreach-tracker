@@ -7,14 +7,17 @@ import type { BrandHistoryEntry } from "@/lib/types";
 import {
   confirmBrandHistory,
   createBrandHistory,
+  deleteBrandHistory,
   dismissBrandHistory,
   fetchBrandHistories,
   generateApiTokenApi,
   triggerBrandScan,
+  updateBrandHistory,
   type ScanSummaryDTO,
 } from "@/lib/api-client";
 
-const EVENT_TYPES = ["New CMO", "Brand Refresh / Rebrand", "Major ATL Campaign"];
+const EVENT_TYPES = ["New CMO", "Brand Refresh / Rebrand", "Major ATL Campaign", "Other"];
+const SALES_NAV_URL = "https://www.linkedin.com/sales/home";
 
 function fmtDate(d: string | null) {
   if (!d) return "—";
@@ -54,6 +57,10 @@ export default function BrandHistoriesView({
   const [newToken, setNewToken] = useState<string | null>(null);
   const [tokenBusy, setTokenBusy] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState({ brand: "", eventType: "", date: "", note: "" });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const brandOptions = useMemo(() => {
     const set = new Set(entries.map((e) => e.brand));
@@ -77,6 +84,49 @@ export default function BrandHistoriesView({
 
   async function handleDismiss(id: number) {
     await dismissBrandHistory(id);
+    await refresh(brandFilter);
+  }
+
+  function startEdit(entry: BrandHistoryEntry) {
+    setEditingId(entry.id);
+    setEditError(null);
+    setEditDraft({
+      brand: entry.brand,
+      eventType: entry.eventType,
+      date: entry.date ? entry.date.slice(0, 10) : "",
+      note: entry.note ?? "",
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditError(null);
+  }
+
+  async function handleEditSave(id: number) {
+    if (!editDraft.brand.trim() || !editDraft.date) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      await updateBrandHistory(id, {
+        brand: editDraft.brand.trim(),
+        eventType: editDraft.eventType,
+        date: editDraft.date,
+        note: editDraft.note.trim(),
+      });
+      setEditingId(null);
+      await refresh(brandFilter);
+    } catch (e) {
+      setEditError((e as Error).message);
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm("Delete this brand history entry? This can't be undone.")) return;
+    await deleteBrandHistory(id);
+    if (editingId === id) setEditingId(null);
     await refresh(brandFilter);
   }
 
@@ -148,6 +198,9 @@ export default function BrandHistoriesView({
           <h1>Brand Histories</h1>
         </div>
         <div className="top-actions">
+          <a href={SALES_NAV_URL} target="_blank" rel="noreferrer" className="btn">
+            Open Sales Navigator ↗
+          </a>
           <Link href="/" className="btn">
             ← Back to queue
           </Link>
@@ -283,40 +336,84 @@ export default function BrandHistoriesView({
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry) => (
-              <tr key={entry.id}>
-                <td>{fmtDate(entry.date)}</td>
-                <td>{entry.brand}</td>
-                <td>{entry.eventType}</td>
-                <td>
-                  <span className={`status-pill ${entry.status}`}>{entry.status}</span>
-                </td>
-                <td>
-                  <span className="source-tag">{SOURCE_LABELS[entry.source] ?? entry.source}</span>
-                </td>
-                <td>
-                  {entry.articleUrl ? (
-                    <a href={entry.articleUrl} target="_blank" rel="noreferrer">
-                      {entry.note || "article"}
-                    </a>
-                  ) : (
-                    entry.note ?? ""
-                  )}
-                </td>
-                <td className="data-grid-actions">
-                  {entry.status === "pending" && (
-                    <>
-                      <button className="btn" onClick={() => handleConfirm(entry.id)}>
-                        Confirm
-                      </button>
-                      <button className="btn" onClick={() => handleDismiss(entry.id)}>
-                        Dismiss
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {entries.map((entry) =>
+              editingId === entry.id ? (
+                <tr key={entry.id}>
+                  <td>
+                    <input type="date" value={editDraft.date} onChange={(e) => setEditDraft({ ...editDraft, date: e.target.value })} />
+                  </td>
+                  <td>
+                    <input value={editDraft.brand} onChange={(e) => setEditDraft({ ...editDraft, brand: e.target.value })} />
+                  </td>
+                  <td>
+                    <select value={editDraft.eventType} onChange={(e) => setEditDraft({ ...editDraft, eventType: e.target.value })}>
+                      {EVENT_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <span className={`status-pill ${entry.status}`}>{entry.status}</span>
+                  </td>
+                  <td>
+                    <span className="source-tag">{SOURCE_LABELS[entry.source] ?? entry.source}</span>
+                  </td>
+                  <td>
+                    <input value={editDraft.note} onChange={(e) => setEditDraft({ ...editDraft, note: e.target.value })} />
+                  </td>
+                  <td className="data-grid-actions">
+                    <button className="btn primary" disabled={editSaving} onClick={() => handleEditSave(entry.id)}>
+                      {editSaving ? "Saving…" : "Save"}
+                    </button>
+                    <button className="btn" disabled={editSaving} onClick={cancelEdit}>
+                      Cancel
+                    </button>
+                    {editError && <div className="error-text">{editError}</div>}
+                  </td>
+                </tr>
+              ) : (
+                <tr key={entry.id}>
+                  <td>{fmtDate(entry.date)}</td>
+                  <td>{entry.brand}</td>
+                  <td>{entry.eventType}</td>
+                  <td>
+                    <span className={`status-pill ${entry.status}`}>{entry.status}</span>
+                  </td>
+                  <td>
+                    <span className="source-tag">{SOURCE_LABELS[entry.source] ?? entry.source}</span>
+                  </td>
+                  <td>
+                    {entry.articleUrl ? (
+                      <a href={entry.articleUrl} target="_blank" rel="noreferrer">
+                        {entry.note || "article"}
+                      </a>
+                    ) : (
+                      entry.note ?? ""
+                    )}
+                  </td>
+                  <td className="data-grid-actions">
+                    {entry.status === "pending" && (
+                      <>
+                        <button className="btn" onClick={() => handleConfirm(entry.id)}>
+                          Confirm
+                        </button>
+                        <button className="btn" onClick={() => handleDismiss(entry.id)}>
+                          Dismiss
+                        </button>
+                      </>
+                    )}
+                    <button className="btn" onClick={() => startEdit(entry)}>
+                      Edit
+                    </button>
+                    <button className="btn" onClick={() => handleDelete(entry.id)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              )
+            )}
           </tbody>
         </table>
       </div>

@@ -756,6 +756,27 @@ export function createBrandHistoryEntry(input: NewBrandHistoryInput): BrandHisto
   return getBrandHistoryEntry(Number(info.lastInsertRowid))!;
 }
 
+export interface UpdateBrandHistoryInput {
+  brand?: string;
+  eventType?: string;
+  date?: string;
+  note?: string | null;
+}
+
+export function updateBrandHistoryEntry(id: number, input: UpdateBrandHistoryInput): BrandHistoryEntry {
+  const db = getDb();
+  const current = getBrandHistoryEntry(id);
+  if (!current) throw new Error("Brand history entry not found");
+  db.prepare(`UPDATE brand_histories SET brand = ?, event_type = ?, date = ?, note = ? WHERE id = ?`).run(
+    input.brand ?? current.brand,
+    input.eventType ?? current.eventType,
+    input.date ?? current.date,
+    input.note !== undefined ? input.note : current.note,
+    id
+  );
+  return getBrandHistoryEntry(id)!;
+}
+
 export function confirmBrandHistoryEntry(id: number): BrandHistoryEntry {
   const db = getDb();
   const current = getBrandHistoryEntry(id);

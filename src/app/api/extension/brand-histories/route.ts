@@ -3,7 +3,7 @@ import { createBrandHistoryEntry, verifyApiToken } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-const EVENT_TYPES = ["New CMO", "Brand Refresh / Rebrand", "Major ATL Campaign"];
+const EVENT_TYPES = ["New CMO", "Brand Refresh / Rebrand", "Major ATL Campaign", "Other"];
 
 // Capture endpoint for the Sales Navigator browser extension — the only
 // route in the app gated by a bearer token, since it's the only one called

@@ -218,6 +218,21 @@ export async function createBrandHistory(payload: NewBrandHistoryPayload): Promi
   return data.entry;
 }
 
+export async function updateBrandHistory(id: number, payload: Partial<NewBrandHistoryPayload>): Promise<BrandHistoryEntry> {
+  const res = await fetch(`/api/brand-histories/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await json<{ entry: BrandHistoryEntry }>(res);
+  return data.entry;
+}
+
+export async function deleteBrandHistory(id: number): Promise<void> {
+  const res = await fetch(`/api/brand-histories/${id}`, { method: "DELETE" });
+  await json(res);
+}
+
 export async function confirmBrandHistory(id: number): Promise<BrandHistoryEntry> {
   const res = await fetch(`/api/brand-histories/${id}/confirm`, { method: "POST" });
   const data = await json<{ entry: BrandHistoryEntry }>(res);
