@@ -323,8 +323,8 @@ export default function BrandHistoriesView({
       {entries.length === 0 && <div className="empty">No brand history entries yet.</div>}
 
       <div className="footnote">
-        Entries dated within the last 60 days give that brand&apos;s contacts a modest, decaying priority boost (up to
-        +15% on the day of the event). Pending entries from the automated news scan don&apos;t affect priority until
+        Entries dated within the last 60 days give that brand&apos;s contacts a decaying priority boost (up to +50% on
+        the day of the event). Pending entries from the automated news scan don&apos;t affect priority until
         confirmed.
       </div>
     </div>
