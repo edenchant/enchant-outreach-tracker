@@ -16,7 +16,8 @@ details in the popup that appears. Nothing runs automatically.
 3. Turn on **Developer mode** (top-right toggle).
 4. Click **Load unpacked** and select this `extension/` folder.
 5. Click the extension's toolbar icon (you may need to pin it via the
-   puzzle-piece icon in Chrome's toolbar first). Paste in:
+   puzzle-piece icon in Chrome's toolbar first) — this opens a settings tab.
+   Paste in:
    - **App URL** — your deployed app's URL (e.g.
      `https://enchant-outreach-tracker.onrender.com`), no trailing slash
      needed.
@@ -47,8 +48,8 @@ entries do.
 
 ## If it stops working
 
-- **"Set the App URL and API token..."** — reopen the toolbar popup and
-  re-save both fields.
+- **"Set the App URL and API token..."** — reopen the settings tab (click
+  the toolbar icon) and re-save both fields.
 - **401 / "invalid API token"** — the token was regenerated in the app
   since you last set this up (generating a new one invalidates the old
   one). Generate a fresh token and paste it in again.

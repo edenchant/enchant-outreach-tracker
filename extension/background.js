@@ -8,6 +8,10 @@
 
 const MENU_ID = "enchant-add-to-brand-histories";
 
+chrome.action.onClicked.addListener(() => {
+  chrome.runtime.openOptionsPage();
+});
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: MENU_ID,
@@ -31,7 +35,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     const { appUrl, apiToken } = await chrome.storage.local.get(["appUrl", "apiToken"]);
     if (!appUrl || !apiToken) {
-      sendResponse({ ok: false, error: "Set the App URL and API token in the extension's toolbar popup first." });
+      sendResponse({ ok: false, error: "Set the App URL and API token in the extension's settings page first." });
       return;
     }
 

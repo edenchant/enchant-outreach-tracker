@@ -258,7 +258,7 @@ export default function BrandHistoriesView({
         </button>
         {newToken && (
           <div className="history-panel" style={{ marginTop: 14 }}>
-            <b>Copy this now — it won&apos;t be shown again.</b> Paste it into the extension&apos;s toolbar popup.
+            <b>Copy this now — it won&apos;t be shown again.</b> Paste it into the extension&apos;s settings page.
             <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
               <code style={{ wordBreak: "break-all" }}>{newToken}</code>
               <button className="btn" onClick={handleCopyToken}>
