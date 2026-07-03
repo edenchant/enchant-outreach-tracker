@@ -213,12 +213,20 @@ h1 {
   color: var(--overdue);
 }
 
-.stat.today .num {
+.stat.upcoming .num {
+  color: var(--upcoming);
+}
+
+.stat.week .num.low {
+  color: var(--overdue);
+}
+
+.stat.week .num.mid {
   color: var(--due-today);
 }
 
-.stat.upcoming .num {
-  color: var(--upcoming);
+.stat.week .num.high {
+  color: var(--signal);
 }
 
 .meter {
@@ -250,10 +258,6 @@ h1 {
 
 .stat.overdue .meter span.lit {
   background: var(--overdue);
-}
-
-.stat.today .meter span.lit {
-  background: var(--due-today);
 }
 
 .stat.upcoming .meter span.lit {

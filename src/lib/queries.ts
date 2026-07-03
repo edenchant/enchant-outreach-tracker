@@ -273,6 +273,7 @@ const GRID_SORT_COLUMNS: Record<string, string> = {
   stage: "s.sort_order",
   priority: "effective_priority_score",
   due: "c.due_at",
+  lastContacted: "c.last_contacted_at",
   segment: "seg.name",
 };
 
@@ -382,6 +383,36 @@ export interface ContactStats {
   today: number;
   upcoming: number;
   total: number;
+  contactedThisWeek: number;
+}
+
+// Monday (UTC) of the current week, as a YYYY-MM-DD string — matches how
+// outreach_events.contacted_at is written (SQLite datetime('now'), UTC).
+function startOfThisWeekISO(): string {
+  const now = new Date();
+  const day = now.getUTCDay();
+  const diffToMonday = day === 0 ? 6 : day - 1;
+  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diffToMonday));
+  return monday.toISOString().slice(0, 10);
+}
+
+function getContactedThisWeek(segmentId?: number): number {
+  const db = getDb();
+  const weekStart = startOfThisWeekISO();
+  if (segmentId) {
+    const row = db
+      .prepare(
+        `SELECT COUNT(*) as n FROM outreach_events oe
+         JOIN contacts c ON c.id = oe.contact_id
+         WHERE oe.type = 'contacted' AND date(oe.contacted_at) >= date(?) AND c.segment_id = ?`
+      )
+      .get(weekStart, segmentId) as any;
+    return row.n;
+  }
+  const row = db
+    .prepare(`SELECT COUNT(*) as n FROM outreach_events WHERE type = 'contacted' AND date(contacted_at) >= date(?)`)
+    .get(weekStart) as any;
+  return row.n;
 }
 
 export function getStats(segmentId: number): ContactStats {
@@ -398,6 +429,7 @@ export function getStats(segmentId: number): ContactStats {
       return diff >= 1 && diff <= 7;
     }).length,
     total: contacts.length,
+    contactedThisWeek: getContactedThisWeek(segmentId),
   };
 }
 
@@ -457,6 +489,7 @@ export function getGlobalStats(): ContactStats {
       return diff >= 1 && diff <= 7;
     }).length,
     total: contacts.length,
+    contactedThisWeek: getContactedThisWeek(),
   };
 }
 

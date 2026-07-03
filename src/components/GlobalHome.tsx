@@ -23,6 +23,13 @@ interface Stats {
   today: number;
   upcoming: number;
   total: number;
+  contactedThisWeek: number;
+}
+
+function weekCountClass(n: number): string {
+  if (n < 10) return "low";
+  if (n < 50) return "mid";
+  return "high";
 }
 
 export default function GlobalHome({
@@ -134,10 +141,9 @@ export default function GlobalHome({
           <div className="label">Overdue</div>
           <StatMeter value={stats.overdue} total={stats.total} />
         </div>
-        <div className="stat today">
-          <div className="num">{stats.today}</div>
-          <div className="label">Due today</div>
-          <StatMeter value={stats.today} total={stats.total} />
+        <div className="stat week">
+          <div className={`num ${weekCountClass(stats.contactedThisWeek)}`}>{stats.contactedThisWeek}</div>
+          <div className="label">Contacted this week</div>
         </div>
         <div className="stat upcoming">
           <div className="num">{stats.upcoming}</div>

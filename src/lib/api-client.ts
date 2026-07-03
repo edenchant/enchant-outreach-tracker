@@ -30,7 +30,7 @@ export async function fetchContacts(q: ContactQuery): Promise<Contact[]> {
 
 export async function fetchStats(slug: string) {
   const res = await fetch(`/api/segments/${slug}/stats`);
-  const data = await json<{ stats: { overdue: number; today: number; upcoming: number; total: number } }>(res);
+  const data = await json<{ stats: { overdue: number; today: number; upcoming: number; total: number; contactedThisWeek: number } }>(res);
   return data.stats;
 }
 
@@ -42,7 +42,7 @@ export async function fetchTopToday(slug: string): Promise<Contact[]> {
 
 export async function fetchGlobalStats() {
   const res = await fetch(`/api/stats`);
-  const data = await json<{ stats: { overdue: number; today: number; upcoming: number; total: number } }>(res);
+  const data = await json<{ stats: { overdue: number; today: number; upcoming: number; total: number; contactedThisWeek: number } }>(res);
   return data.stats;
 }
 

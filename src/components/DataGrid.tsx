@@ -210,6 +210,9 @@ export default function DataGrid({
               <th className="sortable" onClick={() => toggleSort("due")}>
                 Due{sortIndicator("due")}
               </th>
+              <th className="sortable" onClick={() => toggleSort("lastContacted")}>
+                Last contacted{sortIndicator("lastContacted")}
+              </th>
               <th className="sortable" onClick={() => toggleSort("priority")}>
                 Priority{sortIndicator("priority")}
               </th>
@@ -334,6 +337,7 @@ export default function DataGrid({
                     )}
                   </td>
                   <td>{row.dueAt ? new Date(row.dueAt).toLocaleDateString("en-GB") : "—"}</td>
+                  <td>{row.lastContactedAt ? new Date(row.lastContactedAt).toLocaleDateString("en-GB") : "—"}</td>
                   <td title={row.brandBonus ? `Boosted from base ${row.priorityScore.toFixed(1)} — ${row.brandBonus.eventType}, ${row.brandBonus.daysAgo}d ago` : undefined}>
                     {row.effectivePriorityScore.toFixed(1)}
                     {row.brandBonus ? " 📰" : ""}
