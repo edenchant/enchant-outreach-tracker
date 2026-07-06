@@ -4,7 +4,7 @@
 // background.js to send. It never reads the page on its own initiative,
 // never polls, and never re-reads the DOM after the form is shown.
 
-const EVENT_TYPES = ["New CMO", "Brand Refresh / Rebrand", "Major ATL Campaign", "Other"];
+const EVENT_TYPES = ["Brand Refresh / Rebrand", "New Head of Brand", "New CMO", "Major ATL Campaign", "Other"];
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "enchant:show-capture-form") {

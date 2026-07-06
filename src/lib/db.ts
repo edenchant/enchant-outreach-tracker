@@ -101,6 +101,14 @@ function migrate(db: DatabaseSync) {
   if (!hasPromptContext) {
     db.exec("ALTER TABLE contacts ADD COLUMN prompt_context TEXT;");
   }
+  const hasInTouch = contactColumns.some((c) => c.name === "in_touch");
+  if (!hasInTouch) {
+    db.exec("ALTER TABLE contacts ADD COLUMN in_touch INTEGER NOT NULL DEFAULT 0;");
+  }
+  const hasMetInPerson = contactColumns.some((c) => c.name === "met_in_person");
+  if (!hasMetInPerson) {
+    db.exec("ALTER TABLE contacts ADD COLUMN met_in_person INTEGER NOT NULL DEFAULT 0;");
+  }
   const eventColumns = db.prepare("PRAGMA table_info(outreach_events)").all() as Array<{ name: string }>;
   const hasType = eventColumns.some((c) => c.name === "type");
   if (!hasType) {

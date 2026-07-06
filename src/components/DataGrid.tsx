@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import Waveform from "./Waveform";
 import type { GridContact } from "@/lib/types";
 import type { ContactPayload } from "@/lib/api-client";
 import type { Segment, Stage, Tier } from "@/lib/types";
@@ -14,6 +12,60 @@ import {
 } from "@/lib/api-client";
 
 const TIER_LETTERS = ["S", "A", "B", "C", "D"];
+
+type ScrollColKey = "linkedin" | "email" | "inTouch" | "metInPerson" | "lastContacted" | "stage" | "dueAt";
+
+const SCROLL_COLUMN_STORAGE_KEY = "dataGridColumnOrder";
+const DEFAULT_COLUMN_ORDER: ScrollColKey[] = ["linkedin", "email", "inTouch", "metInPerson", "lastContacted", "stage", "dueAt"];
+
+const SCROLL_COLUMN_LABELS: Record<ScrollColKey, string> = {
+  linkedin: "LinkedIn",
+  email: "Email",
+  inTouch: "In touch",
+  metInPerson: "Met in person",
+  lastContacted: "Last contact",
+  stage: "Stage",
+  dueAt: "Next due",
+};
+
+const SCROLL_COLUMN_SORT_KEY: Partial<Record<ScrollColKey, string>> = {
+  inTouch: "inTouch",
+  metInPerson: "metInPerson",
+  lastContacted: "lastContacted",
+  stage: "stage",
+  dueAt: "due",
+};
+
+// Fixed, non-reorderable identifying columns, pinned to the left of the
+// horizontally-scrolling area. Widths are explicit so left offsets can be
+// computed for position: sticky.
+const FIXED_COLUMNS: Array<{ key: string; label: string; width: number; sort?: string }> = [
+  { key: "clientType", label: "Client type", width: 110, sort: "segment" },
+  { key: "tier", label: "Tier", width: 64, sort: "tier" },
+  { key: "brand", label: "Brand / Company", width: 170, sort: "brand" },
+  { key: "name", label: "Contact Name", width: 170, sort: "name" },
+  { key: "role", label: "Job Role", width: 160, sort: "role" },
+];
+
+function fixedColumnLeft(index: number): number {
+  return FIXED_COLUMNS.slice(0, index).reduce((sum, c) => sum + c.width, 0);
+}
+
+function fmtDMY(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getUTCFullYear()}`;
+}
+
+function toDateInputValue(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
 
 export default function DataGrid({
   segments,
@@ -37,8 +89,36 @@ export default function DataGrid({
   const [editMode, setEditMode] = useState(false);
   const [pendingSaves, setPendingSaves] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [columnOrder, setColumnOrder] = useState<ScrollColKey[]>(DEFAULT_COLUMN_ORDER);
+  const dragKey = useRef<ScrollColKey | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<ScrollColKey | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Deferred to a post-mount effect (rather than the useState initializer)
+  // so the client's first render matches the server's, then reorders once
+  // the saved preference is known — avoids a hydration mismatch.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(SCROLL_COLUMN_STORAGE_KEY);
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === DEFAULT_COLUMN_ORDER.length && DEFAULT_COLUMN_ORDER.every((k) => parsed.includes(k))) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore of a client-only preference, deferred past the initial render to keep SSR/client markup identical for hydration
+        setColumnOrder(parsed as ScrollColKey[]);
+      }
+    } catch {
+      // ignore malformed/unavailable storage
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SCROLL_COLUMN_STORAGE_KEY, JSON.stringify(columnOrder));
+    } catch {
+      // ignore unavailable storage
+    }
+  }, [columnOrder]);
 
   async function refresh() {
     const result = await fetchGrid({
@@ -80,7 +160,8 @@ export default function DataGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows]);
 
-  function toggleSort(col: string) {
+  function toggleSort(col?: string) {
+    if (!col) return;
     if (sortBy === col) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
     } else {
@@ -109,31 +190,109 @@ export default function DataGrid({
     await refresh();
   }
 
+  function handleColumnDrop(targetKey: ScrollColKey) {
+    const source = dragKey.current;
+    dragKey.current = null;
+    setDragOverKey(null);
+    if (!source || source === targetKey) return;
+    setColumnOrder((prev) => {
+      const next = prev.filter((k) => k !== source);
+      const targetIdx = next.indexOf(targetKey);
+      next.splice(targetIdx, 0, source);
+      return next;
+    });
+  }
+
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
 
-  function sortIndicator(col: string) {
-    if (sortBy !== col) return "";
+  function sortIndicator(col?: string) {
+    if (!col || sortBy !== col) return "";
     return sortDir === "asc" ? " ▲" : " ▼";
   }
 
-  return (
-    <div className="wrap">
-      <header className="top">
-        <div>
-          <p className="eyebrow">Enchant · full database</p>
-          <h1>Data Grid</h1>
-        </div>
-        <div className="top-actions">
-          <Link href="/" className="btn">
-            ← Back to queue
-          </Link>
-          <Link href="/brand-histories" className="btn">
-            Brand histories
-          </Link>
-        </div>
-        <Waveform />
-      </header>
+  function renderScrollCell(row: GridContact, key: ScrollColKey, cfg: { tiers: Tier[]; stages: Stage[] } | undefined) {
+    switch (key) {
+      case "linkedin":
+        return editMode ? (
+          <input
+            defaultValue={row.linkedin ?? ""}
+            onBlur={(e) => {
+              const val = e.target.value.trim() || null;
+              if (val !== (row.linkedin ?? null)) saveField(row, { linkedin: val });
+            }}
+          />
+        ) : row.linkedin ? (
+          <a className="btn" href={row.linkedin} target="_blank" rel="noreferrer">
+            LinkedIn
+          </a>
+        ) : (
+          "—"
+        );
+      case "email":
+        return editMode ? (
+          <input
+            defaultValue={row.email ?? ""}
+            onBlur={(e) => {
+              const val = e.target.value.trim() || null;
+              if (val !== (row.email ?? null)) saveField(row, { email: val });
+            }}
+          />
+        ) : row.email ? (
+          <a className="btn" href={`mailto:${row.email}`}>
+            Email
+          </a>
+        ) : (
+          "—"
+        );
+      case "inTouch":
+        return editMode ? (
+          <input type="checkbox" defaultChecked={row.inTouch} onChange={(e) => saveField(row, { inTouch: e.target.checked })} />
+        ) : (
+          <span className={`bool-pill ${row.inTouch ? "yes" : "no"}`}>{row.inTouch ? "Y" : "N"}</span>
+        );
+      case "metInPerson":
+        return editMode ? (
+          <input type="checkbox" defaultChecked={row.metInPerson} onChange={(e) => saveField(row, { metInPerson: e.target.checked })} />
+        ) : (
+          <span className={`bool-pill ${row.metInPerson ? "yes" : "no"}`}>{row.metInPerson ? "Y" : "N"}</span>
+        );
+      case "lastContacted":
+        return editMode ? (
+          <input
+            type="date"
+            defaultValue={toDateInputValue(row.lastContactedAt)}
+            onChange={(e) => {
+              const val = e.target.value || null;
+              if (val !== toDateInputValue(row.lastContactedAt)) saveField(row, { lastContactedAt: val });
+            }}
+          />
+        ) : (
+          fmtDMY(row.lastContactedAt)
+        );
+      case "stage":
+        return editMode ? (
+          <select
+            defaultValue={row.stageId ? String(row.stageId) : ""}
+            disabled={!cfg}
+            onChange={(e) => saveField(row, { stageId: e.target.value ? Number(e.target.value) : null })}
+          >
+            <option value="">—</option>
+            {(cfg?.stages ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          row.stage?.name ?? "—"
+        );
+      case "dueAt":
+        return fmtDMY(row.dueAt);
+    }
+  }
 
+  return (
+    <div className="data-grid-embed">
       <div className="controls">
         <input
           type="text"
@@ -185,39 +344,45 @@ export default function DataGrid({
         <table className="settings-table data-grid-table">
           <thead>
             <tr>
-              <th className="sortable" onClick={() => toggleSort("segment")}>
-                Segment{sortIndicator("segment")}
-              </th>
-              <th className="sortable" onClick={() => toggleSort("tier")}>
-                Tier{sortIndicator("tier")}
-              </th>
-              <th className="sortable" onClick={() => toggleSort("brand")}>
-                Brand{sortIndicator("brand")}
-              </th>
-              <th>Sub-brand</th>
-              <th className="sortable" onClick={() => toggleSort("name")}>
-                Name{sortIndicator("name")}
-              </th>
-              <th className="sortable" onClick={() => toggleSort("role")}>
-                Role{sortIndicator("role")}
-              </th>
-              <th className="sortable" onClick={() => toggleSort("followers")}>
-                Followers{sortIndicator("followers")}
-              </th>
-              <th className="sortable" onClick={() => toggleSort("stage")}>
-                Stage{sortIndicator("stage")}
-              </th>
-              <th className="sortable" onClick={() => toggleSort("due")}>
-                Due{sortIndicator("due")}
-              </th>
-              <th className="sortable" onClick={() => toggleSort("lastContacted")}>
-                Last contacted{sortIndicator("lastContacted")}
-              </th>
-              <th className="sortable" onClick={() => toggleSort("priority")}>
-                Priority{sortIndicator("priority")}
-              </th>
-              <th>Email</th>
-              <th>LinkedIn</th>
+              {FIXED_COLUMNS.map((col, idx) => (
+                <th
+                  key={col.key}
+                  className={`sticky-col ${col.sort ? "sortable" : ""} ${idx === FIXED_COLUMNS.length - 1 ? "sticky-col-last" : ""}`}
+                  style={{ left: fixedColumnLeft(idx), width: col.width }}
+                  onClick={() => toggleSort(col.sort)}
+                >
+                  {col.label}
+                  {sortIndicator(col.sort)}
+                </th>
+              ))}
+              {columnOrder.map((key) => (
+                <th
+                  key={key}
+                  className={`sortable draggable-col ${dragOverKey === key ? "drag-over" : ""}`}
+                  draggable
+                  onClick={() => toggleSort(SCROLL_COLUMN_SORT_KEY[key])}
+                  onDragStart={() => {
+                    dragKey.current = key;
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOverKey(key);
+                  }}
+                  onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleColumnDrop(key);
+                  }}
+                  onDragEnd={() => {
+                    dragKey.current = null;
+                    setDragOverKey(null);
+                  }}
+                  title="Drag to reorder"
+                >
+                  ⠿ {SCROLL_COLUMN_LABELS[key]}
+                  {sortIndicator(SCROLL_COLUMN_SORT_KEY[key])}
+                </th>
+              ))}
               <th></th>
             </tr>
           </thead>
@@ -227,8 +392,10 @@ export default function DataGrid({
               const rowKey = `${row.id}-${row.updatedAt}`;
               return (
                 <tr key={rowKey}>
-                  <td>{row.segmentName}</td>
-                  <td>
+                  <td className="sticky-col" style={{ left: fixedColumnLeft(0), width: FIXED_COLUMNS[0].width }}>
+                    {row.segmentName}
+                  </td>
+                  <td className="sticky-col" style={{ left: fixedColumnLeft(1), width: FIXED_COLUMNS[1].width }}>
                     {editMode ? (
                       <select
                         defaultValue={row.tierId ? String(row.tierId) : ""}
@@ -246,7 +413,7 @@ export default function DataGrid({
                       row.tier?.label ?? "—"
                     )}
                   </td>
-                  <td>
+                  <td className="sticky-col" style={{ left: fixedColumnLeft(2), width: FIXED_COLUMNS[2].width }}>
                     {editMode ? (
                       <input
                         defaultValue={row.brand ?? ""}
@@ -259,20 +426,7 @@ export default function DataGrid({
                       row.brand ?? ""
                     )}
                   </td>
-                  <td>
-                    {editMode ? (
-                      <input
-                        defaultValue={row.subBrand ?? ""}
-                        onBlur={(e) => {
-                          const val = e.target.value.trim() || null;
-                          if (val !== (row.subBrand ?? null)) saveField(row, { subBrand: val });
-                        }}
-                      />
-                    ) : (
-                      row.subBrand ?? ""
-                    )}
-                  </td>
-                  <td>
+                  <td className="sticky-col" style={{ left: fixedColumnLeft(3), width: FIXED_COLUMNS[3].width }}>
                     {editMode ? (
                       <input
                         defaultValue={row.name}
@@ -289,7 +443,7 @@ export default function DataGrid({
                       row.name
                     )}
                   </td>
-                  <td>
+                  <td className="sticky-col sticky-col-last" style={{ left: fixedColumnLeft(4), width: FIXED_COLUMNS[4].width }}>
                     {editMode ? (
                       <input
                         defaultValue={row.role ?? ""}
@@ -302,76 +456,9 @@ export default function DataGrid({
                       row.role ?? ""
                     )}
                   </td>
-                  <td>
-                    {editMode ? (
-                      <input
-                        type="number"
-                        min="0"
-                        defaultValue={row.followers != null ? String(row.followers) : ""}
-                        onBlur={(e) => {
-                          const raw = e.target.value.trim();
-                          const val = raw ? Number(raw) : null;
-                          if (val !== row.followers) saveField(row, { followers: val });
-                        }}
-                      />
-                    ) : (
-                      row.followers?.toLocaleString() ?? ""
-                    )}
-                  </td>
-                  <td>
-                    {editMode ? (
-                      <select
-                        defaultValue={row.stageId ? String(row.stageId) : ""}
-                        disabled={!cfg}
-                        onChange={(e) => saveField(row, { stageId: e.target.value ? Number(e.target.value) : null })}
-                      >
-                        <option value="">—</option>
-                        {(cfg?.stages ?? []).map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      row.stage?.name ?? "—"
-                    )}
-                  </td>
-                  <td>{row.dueAt ? new Date(row.dueAt).toLocaleDateString("en-GB") : "—"}</td>
-                  <td>{row.lastContactedAt ? new Date(row.lastContactedAt).toLocaleDateString("en-GB") : "—"}</td>
-                  <td title={row.brandBonus ? `Boosted from base ${row.priorityScore.toFixed(1)} — ${row.brandBonus.eventType}, ${row.brandBonus.daysAgo}d ago` : undefined}>
-                    {row.effectivePriorityScore.toFixed(1)}
-                    {row.brandBonus ? " 📰" : ""}
-                  </td>
-                  <td>
-                    {editMode ? (
-                      <input
-                        defaultValue={row.email ?? ""}
-                        onBlur={(e) => {
-                          const val = e.target.value.trim() || null;
-                          if (val !== (row.email ?? null)) saveField(row, { email: val });
-                        }}
-                      />
-                    ) : (
-                      row.email ?? ""
-                    )}
-                  </td>
-                  <td>
-                    {editMode ? (
-                      <input
-                        defaultValue={row.linkedin ?? ""}
-                        onBlur={(e) => {
-                          const val = e.target.value.trim() || null;
-                          if (val !== (row.linkedin ?? null)) saveField(row, { linkedin: val });
-                        }}
-                      />
-                    ) : row.linkedin ? (
-                      <a href={row.linkedin} target="_blank" rel="noreferrer">
-                        in
-                      </a>
-                    ) : (
-                      ""
-                    )}
-                  </td>
+                  {columnOrder.map((key) => (
+                    <td key={key}>{renderScrollCell(row, key, cfg)}</td>
+                  ))}
                   <td className="data-grid-actions">
                     {editMode && (
                       <button className="btn" onClick={() => handleDelete(row.id)}>

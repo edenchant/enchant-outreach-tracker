@@ -855,6 +855,64 @@ select {
   gap: 6px;
 }
 
+.data-grid-embed {
+  margin-bottom: 24px;
+}
+
+.data-grid-heading {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+
+.sticky-col {
+  position: sticky;
+  background: var(--panel);
+  z-index: 2;
+}
+
+thead .sticky-col {
+  z-index: 3;
+}
+
+.sticky-col-last {
+  box-shadow: 4px 0 6px -4px rgba(0, 0, 0, 0.25);
+}
+
+.data-grid-table tbody tr:focus-within .sticky-col {
+  background: var(--accent-soft);
+}
+
+.draggable-col {
+  cursor: grab;
+}
+
+.draggable-col.drag-over {
+  background: var(--accent-soft);
+}
+
+.bool-pill {
+  display: inline-block;
+  min-width: 18px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.bool-pill.yes {
+  background: var(--due-today-soft);
+  color: var(--due-today);
+}
+
+.bool-pill.no {
+  background: var(--bg);
+  color: var(--ink-soft);
+}
+
 .data-grid-pagination {
   display: flex;
   align-items: center;

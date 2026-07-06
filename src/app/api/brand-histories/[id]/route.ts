@@ -3,7 +3,7 @@ import { dismissBrandHistoryEntry, updateBrandHistoryEntry } from "@/lib/queries
 
 export const dynamic = "force-dynamic";
 
-const EVENT_TYPES = ["New CMO", "Brand Refresh / Rebrand", "Major ATL Campaign", "Other"];
+const EVENT_TYPES = ["Brand Refresh / Rebrand", "New Head of Brand", "New CMO", "Major ATL Campaign", "Other"];
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

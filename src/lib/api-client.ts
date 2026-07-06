@@ -91,6 +91,9 @@ export interface ContactPayload {
   followers?: number | null;
   linkedin?: string | null;
   email?: string | null;
+  lastContactedAt?: string | null;
+  inTouch?: boolean;
+  metInPerson?: boolean;
 }
 
 export async function createContact(payload: ContactPayload): Promise<Contact> {

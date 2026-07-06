@@ -38,6 +38,8 @@ export interface Contact {
   email: string | null;
   lastContactedAt: string | null;
   dueAt: string | null;
+  inTouch: boolean;
+  metInPerson: boolean;
   priorityScore: number;
   effectivePriorityScore: number;
   promptContext: string | null;
@@ -59,7 +61,7 @@ export interface BrandBonusInfo {
 export interface BrandHistoryEntry {
   id: number;
   brand: string;
-  eventType: "New CMO" | "Brand Refresh / Rebrand" | "Major ATL Campaign";
+  eventType: "New CMO" | "Brand Refresh / Rebrand" | "Major ATL Campaign" | "New Head of Brand" | "Other";
   date: string;
   note: string | null;
   source: "manual" | "news_api" | "sales_nav_feed";

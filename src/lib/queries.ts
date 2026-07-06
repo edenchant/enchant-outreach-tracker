@@ -46,6 +46,8 @@ function toContact(row: any, now: Date): Contact {
     email: row.email,
     lastContactedAt: row.last_contacted_at,
     dueAt: row.due_at,
+    inTouch: !!row.in_touch,
+    metInPerson: !!row.met_in_person,
     priorityScore: row.priority_score,
     effectivePriorityScore: row.priority_score,
     promptContext: row.prompt_context,
@@ -80,7 +82,7 @@ function applyBrandBonus<T extends Contact>(contact: T, brandMap: Map<string, { 
   const entry = contact.brand ? brandMap.get(contact.brand) : undefined;
   if (!entry) return contact;
   const daysAgo = daysBetween(now, new Date(entry.date));
-  const multiplier = brandBonusMultiplier(daysAgo);
+  const multiplier = brandBonusMultiplier(entry.eventType, daysAgo);
   if (multiplier <= 1) return contact;
   return {
     ...contact,
@@ -276,6 +278,8 @@ const GRID_SORT_COLUMNS: Record<string, string> = {
   due: "c.due_at",
   lastContacted: "c.last_contacted_at",
   segment: "seg.name",
+  inTouch: "c.in_touch",
+  metInPerson: "c.met_in_person",
 };
 
 const BRAND_LAST_EVENT_DATE_SQL =
@@ -342,7 +346,7 @@ export function listAllContacts(filters: GridFilters): GridResult {
         s.id as stage_id_j, s.name as stage_name, s.sort_order as stage_sort_order, s.interval_days as stage_interval_days, s.weight as stage_weight, s.is_terminal as stage_is_terminal,
         ${BRAND_LAST_EVENT_DATE_SQL} as brand_last_event_date,
         ${BRAND_LAST_EVENT_TYPE_SQL} as brand_last_event_type,
-        ${brandBonusSqlExpression("c.priority_score", BRAND_LAST_EVENT_DATE_SQL)} as effective_priority_score
+        ${brandBonusSqlExpression("c.priority_score", BRAND_LAST_EVENT_DATE_SQL, BRAND_LAST_EVENT_TYPE_SQL)} as effective_priority_score
        FROM contacts c
        JOIN segments seg ON seg.id = c.segment_id
        LEFT JOIN tiers t ON t.id = c.tier_id
@@ -531,6 +535,8 @@ export interface NewContactInput {
   email?: string | null;
   lastContactedAt?: string | null;
   dueAt?: string | null;
+  inTouch?: boolean;
+  metInPerson?: boolean;
   promptContext?: string | null;
 }
 
@@ -550,8 +556,8 @@ export function createContact(input: NewContactInput): Contact {
 
   const info = db
     .prepare(
-      `INSERT INTO contacts (segment_id, tier_id, stage_id, brand, sub_brand, name, role, followers, linkedin, email, last_contacted_at, due_at, priority_score, prompt_context)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO contacts (segment_id, tier_id, stage_id, brand, sub_brand, name, role, followers, linkedin, email, last_contacted_at, due_at, in_touch, met_in_person, priority_score, prompt_context)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       input.segmentId,
@@ -566,6 +572,8 @@ export function createContact(input: NewContactInput): Contact {
       input.email ?? null,
       input.lastContactedAt ?? null,
       dueAt,
+      input.inTouch ? 1 : 0,
+      input.metInPerson ? 1 : 0,
       priority,
       input.promptContext ?? null
     );
@@ -591,14 +599,16 @@ export function updateContact(id: number, fields: UpdateContactInput): Contact {
     email: fields.email !== undefined ? fields.email : current.email,
     lastContactedAt: fields.lastContactedAt !== undefined ? fields.lastContactedAt : current.last_contacted_at,
     dueAt: fields.dueAt !== undefined ? fields.dueAt : current.due_at,
+    inTouch: fields.inTouch !== undefined ? (fields.inTouch ? 1 : 0) : current.in_touch,
+    metInPerson: fields.metInPerson !== undefined ? (fields.metInPerson ? 1 : 0) : current.met_in_person,
   };
   const priority = priorityForContact(db, merged.tierId, merged.stageId, merged.followers);
 
   db.prepare(
-    `UPDATE contacts SET tier_id = ?, stage_id = ?, brand = ?, sub_brand = ?, name = ?, role = ?, followers = ?, linkedin = ?, email = ?, last_contacted_at = ?, due_at = ?, priority_score = ?, updated_at = datetime('now') WHERE id = ?`
+    `UPDATE contacts SET tier_id = ?, stage_id = ?, brand = ?, sub_brand = ?, name = ?, role = ?, followers = ?, linkedin = ?, email = ?, last_contacted_at = ?, due_at = ?, in_touch = ?, met_in_person = ?, priority_score = ?, updated_at = datetime('now') WHERE id = ?`
   ).run(
     merged.tierId, merged.stageId, merged.brand, merged.subBrand, merged.name, merged.role, merged.followers,
-    merged.linkedin, merged.email, merged.lastContactedAt, merged.dueAt, priority, id
+    merged.linkedin, merged.email, merged.lastContactedAt, merged.dueAt, merged.inTouch, merged.metInPerson, priority, id
   );
   return getContact(id)!;
 }
@@ -730,6 +740,17 @@ export function listBrandHistories(filters: BrandHistoryFilters = {}): BrandHist
 export function getBrandHistoryEntry(id: number): BrandHistoryEntry | null {
   const db = getDb();
   const row = db.prepare("SELECT * FROM brand_histories WHERE id = ?").get(id);
+  return row ? toBrandHistory(row) : null;
+}
+
+// Most recent confirmed entry for a brand, regardless of age — used to give
+// draft-email generation real background, independent of the 60-day window
+// that gates the priority-score bonus above.
+export function getLatestBrandHistoryEntry(brand: string): BrandHistoryEntry | null {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT * FROM brand_histories WHERE brand = ? AND status = 'confirmed' ORDER BY date DESC, id DESC LIMIT 1`)
+    .get(brand);
   return row ? toBrandHistory(row) : null;
 }
 

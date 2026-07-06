@@ -17,6 +17,7 @@ import StatMeter from "./StatMeter";
 import ContactCard from "./ContactCard";
 import ContactFormModal from "./ContactFormModal";
 import DraftModal from "./DraftModal";
+import DataGrid from "./DataGrid";
 
 interface Stats {
   overdue: number;
@@ -36,10 +37,14 @@ export default function GlobalHome({
   segments,
   initialStats,
   initialTopToday,
+  initialGridRows,
+  initialGridTotal,
 }: {
   segments: Segment[];
   initialStats: Stats;
   initialTopToday: GridContact[];
+  initialGridRows: GridContact[];
+  initialGridTotal: number;
 }) {
   const [stats, setStats] = useState<Stats>(initialStats);
   const [topToday, setTopToday] = useState<GridContact[]>(initialTopToday);
@@ -105,9 +110,6 @@ export default function GlobalHome({
           <h1>Today&apos;s Priority Queue</h1>
         </div>
         <div className="top-actions">
-          <Link href="/data" className="btn">
-            Data grid
-          </Link>
           <Link href="/brand-histories" className="btn">
             Brand histories
           </Link>
@@ -183,6 +185,9 @@ export default function GlobalHome({
         </div>
         {topToday.length === 0 && <div className="empty">Nothing overdue or due today — nice work.</div>}
       </div>
+
+      <h2 className="data-grid-heading">Full contact database</h2>
+      <DataGrid segments={segments} initialRows={initialGridRows} initialTotal={initialGridTotal} />
 
       <div className="footnote">
         Combined view across {segments.length} segments · {stats.total} contacts total. Jump into a segment above for

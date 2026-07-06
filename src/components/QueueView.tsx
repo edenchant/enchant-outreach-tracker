@@ -117,7 +117,7 @@ export default function QueueView({
           <h1>Today&apos;s Outreach Queue</h1>
         </div>
         <div className="top-actions">
-          <Link href="/data" className="btn">
+          <Link href="/" className="btn">
             Data grid
           </Link>
           <Link href="/brand-histories" className="btn">

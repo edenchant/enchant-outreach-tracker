@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
-import type { Contact } from "./types";
+import type { BrandHistoryEntry, Contact } from "./types";
 
 const PROMPT_DATA_DIR = path.join(process.cwd(), "src", "lib", "prompt-data");
 
@@ -49,9 +49,10 @@ export interface DraftRequest {
   contact: Contact;
   kind: DraftKind;
   extraContext?: string;
+  brandHistory?: BrandHistoryEntry | null;
 }
 
-function contactBrief(contact: Contact): string {
+function contactBrief(contact: Contact, brandHistory?: BrandHistoryEntry | null): string {
   const parts: string[] = [];
   parts.push(`Name: ${contact.name}`);
   parts.push(`Role: ${contact.role ?? "unknown"}`);
@@ -61,10 +62,15 @@ function contactBrief(contact: Contact): string {
   parts.push(`Followers: ${contact.followers ?? "unknown"}`);
   if (contact.lastContactedAt) parts.push(`Last contacted: ${new Date(contact.lastContactedAt).toLocaleDateString("en-GB")}`);
   if (contact.promptContext) parts.push(`Notes from the outreach tracker: ${contact.promptContext}`);
+  if (brandHistory) {
+    parts.push(
+      `Most recent Brand Histories entry for this brand: ${brandHistory.eventType} on ${new Date(brandHistory.date).toLocaleDateString("en-GB")}${brandHistory.note ? ` — ${brandHistory.note}` : ""}. Reference this where it naturally fits.`
+    );
+  }
   return parts.join("\n");
 }
 
-export async function draftMessage({ contact, kind, extraContext }: DraftRequest): Promise<string> {
+export async function draftMessage({ contact, kind, extraContext, brandHistory }: DraftRequest): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured on this deployment.");
@@ -83,7 +89,7 @@ export async function draftMessage({ contact, kind, extraContext }: DraftRequest
 
   const userMessage = `${instructionLine}
 
-${contactBrief(contact)}${contextBlock}
+${contactBrief(contact, brandHistory)}${contextBlock}
 
 This is a one-shot, unattended request — if you would normally ask a clarifying question first, make the most reasonable assumption instead and produce the draft directly. Reply with only the draft itself, no preamble or explanation.`;
 

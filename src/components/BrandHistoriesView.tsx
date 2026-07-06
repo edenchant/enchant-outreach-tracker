@@ -16,7 +16,7 @@ import {
   type ScanSummaryDTO,
 } from "@/lib/api-client";
 
-const EVENT_TYPES = ["New CMO", "Brand Refresh / Rebrand", "Major ATL Campaign", "Other"];
+const EVENT_TYPES = ["Brand Refresh / Rebrand", "New Head of Brand", "New CMO", "Major ATL Campaign", "Other"];
 const SALES_NAV_URL = "https://www.linkedin.com/sales/home";
 
 function fmtDate(d: string | null) {
@@ -420,9 +420,10 @@ export default function BrandHistoriesView({
       {entries.length === 0 && <div className="empty">No brand history entries yet.</div>}
 
       <div className="footnote">
-        Entries dated within the last 60 days give that brand&apos;s contacts a decaying priority boost (up to +50% on
-        the day of the event). Pending entries from the automated news scan don&apos;t affect priority until
-        confirmed.
+        Entries dated within the last 60 days give that brand&apos;s contacts a decaying priority boost, sized by event
+        type on the day of the event and fading to zero by day 60: Brand Refresh / Rebrand +50%, New Head of Brand
+        +30%, New CMO +20%, Major ATL Campaign +15% (Other +15%). Pending entries from the automated news scan
+        don&apos;t affect priority until confirmed.
       </div>
     </div>
   );

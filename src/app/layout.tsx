@@ -31,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${workSans.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en-GB" className={`${bricolage.variable} ${workSans.variable} ${jetbrainsMono.variable}`}>
       <body>{children}</body>
     </html>
   );

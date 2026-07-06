@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createBrandHistoryEntry, findRecentSimilarBrandEvent, getSetting, listDistinctBrands, setSetting } from "./queries";
 
-const EVENT_TYPES = ["New CMO", "Brand Refresh / Rebrand", "Major ATL Campaign"] as const;
+const EVENT_TYPES = ["Brand Refresh / Rebrand", "New Head of Brand", "New CMO", "Major ATL Campaign"] as const;
 type EventType = (typeof EVENT_TYPES)[number];
 
 // Same underlying story covered by several outlets in one week should
@@ -89,7 +89,7 @@ async function classifyHeadlines(brand: string, headlines: NewsHeadline[]): Prom
 
   const prompt = `We're monitoring news coverage of the brand "${brand}" for our outreach tracker. For each numbered headline below, decide:
 1. Is this genuinely about "${brand}" the brand/company (not an unrelated use of the same word)?
-2. If relevant, does it report one of exactly these three event types: "New CMO" (a new chief marketing officer or senior marketing leader appointed), "Brand Refresh / Rebrand" (a rebrand, new visual identity, or brand refresh), or "Major ATL Campaign" (a new major above-the-line advertising campaign launch)?
+2. If relevant, does it report one of exactly these four event types: "Brand Refresh / Rebrand" (a rebrand, new visual identity, or brand refresh), "New Head of Brand" (a new head of brand, brand director, or similarly-titled senior brand leader appointed — but not a CMO), "New CMO" (a new chief marketing officer or most senior marketing leader appointed), or "Major ATL Campaign" (a new major above-the-line advertising campaign launch)?
 
 Headlines:
 ${list}
@@ -97,7 +97,7 @@ ${list}
 Reply with ONLY a JSON array, one object per headline, in this exact shape, no other text:
 [{"index": 0, "relevant": true, "eventType": "New CMO", "reason": "one short sentence"}]
 
-Use eventType: null and relevant: false for anything that doesn't clearly match one of the three types.`;
+Use eventType: null and relevant: false for anything that doesn't clearly match one of the four types.`;
 
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
