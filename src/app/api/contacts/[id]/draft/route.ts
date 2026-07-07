@@ -25,6 +25,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         { status: 503 }
       );
     }
+    if (message.includes("credit balance is too low")) {
+      return NextResponse.json(
+        { error: "The Anthropic account behind this app's API key is out of credit — add credits at console.anthropic.com under Plans & Billing." },
+        { status: 502 }
+      );
+    }
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }
