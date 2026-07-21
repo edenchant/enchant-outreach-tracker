@@ -94,6 +94,7 @@ export interface ContactPayload {
   lastContactedAt?: string | null;
   inTouch?: boolean;
   metInPerson?: boolean;
+  converted?: boolean;
 }
 
 export async function createContact(payload: ContactPayload): Promise<Contact> {

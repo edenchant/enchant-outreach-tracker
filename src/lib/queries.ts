@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw sqlite rows are untyped */
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { getDb } from "./db";
-import { brandBonusMultiplier, brandBonusSqlExpression, classify, computePriority, daysBetween } from "./priority";
+import { brandBonusMultiplier, brandBonusSqlExpression, classify, computePriority, daysBetween, relationshipMultiplier } from "./priority";
 import type { BrandHistoryEntry, Contact, GridContact, OutreachEvent, Segment, Stage, Tier } from "./types";
 
 function toSegment(row: any): Segment {
@@ -48,6 +48,7 @@ function toContact(row: any, now: Date): Contact {
     dueAt: row.due_at,
     inTouch: !!row.in_touch,
     metInPerson: !!row.met_in_person,
+    converted: !!row.converted,
     priorityScore: row.priority_score,
     effectivePriorityScore: row.priority_score,
     promptContext: row.prompt_context,
@@ -209,7 +210,7 @@ function recomputeContactsForTier(tierId: number) {
     const c = toContact(row, now);
     const tierWeight = c.tier?.weight ?? 0;
     const stageWeight = c.stage?.weight ?? 0;
-    const priority = computePriority(c.followers, tierWeight, stageWeight);
+    const priority = computePriority(c.followers, tierWeight, stageWeight, relationshipMultiplier(c.inTouch, c.converted));
     db.prepare("UPDATE contacts SET priority_score = ? WHERE id = ?").run(priority, c.id);
   }
 }
@@ -222,7 +223,7 @@ function recomputeContactsForStage(stageId: number) {
     const c = toContact(row, now);
     const tierWeight = c.tier?.weight ?? 0;
     const stageWeight = c.stage?.weight ?? 0;
-    const priority = computePriority(c.followers, tierWeight, stageWeight);
+    const priority = computePriority(c.followers, tierWeight, stageWeight, relationshipMultiplier(c.inTouch, c.converted));
     db.prepare("UPDATE contacts SET priority_score = ? WHERE id = ?").run(priority, c.id);
   }
 }
@@ -280,6 +281,7 @@ const GRID_SORT_COLUMNS: Record<string, string> = {
   segment: "seg.name",
   inTouch: "c.in_touch",
   metInPerson: "c.met_in_person",
+  converted: "c.converted",
 };
 
 const BRAND_LAST_EVENT_DATE_SQL =
@@ -537,13 +539,21 @@ export interface NewContactInput {
   dueAt?: string | null;
   inTouch?: boolean;
   metInPerson?: boolean;
+  converted?: boolean;
   promptContext?: string | null;
 }
 
-function priorityForContact(db: ReturnType<typeof getDb>, tierId: number | null, stageId: number | null, followers: number | null): number {
+function priorityForContact(
+  db: ReturnType<typeof getDb>,
+  tierId: number | null,
+  stageId: number | null,
+  followers: number | null,
+  inTouch: boolean,
+  converted: boolean
+): number {
   const tier = tierId ? (db.prepare("SELECT weight FROM tiers WHERE id = ?").get(tierId) as any) : null;
   const stage = stageId ? (db.prepare("SELECT weight FROM stages WHERE id = ?").get(stageId) as any) : null;
-  return computePriority(followers, tier?.weight ?? 0, stage?.weight ?? 0);
+  return computePriority(followers, tier?.weight ?? 0, stage?.weight ?? 0, relationshipMultiplier(inTouch, converted));
 }
 
 export function createContact(input: NewContactInput): Contact {
@@ -552,12 +562,12 @@ export function createContact(input: NewContactInput): Contact {
   const stageId = input.stageId ?? null;
   const followers = input.followers ?? null;
   const dueAt = input.dueAt ?? new Date().toISOString();
-  const priority = priorityForContact(db, tierId, stageId, followers);
+  const priority = priorityForContact(db, tierId, stageId, followers, !!input.inTouch, !!input.converted);
 
   const info = db
     .prepare(
-      `INSERT INTO contacts (segment_id, tier_id, stage_id, brand, sub_brand, name, role, followers, linkedin, email, last_contacted_at, due_at, in_touch, met_in_person, priority_score, prompt_context)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO contacts (segment_id, tier_id, stage_id, brand, sub_brand, name, role, followers, linkedin, email, last_contacted_at, due_at, in_touch, met_in_person, converted, priority_score, prompt_context)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       input.segmentId,
@@ -574,6 +584,7 @@ export function createContact(input: NewContactInput): Contact {
       dueAt,
       input.inTouch ? 1 : 0,
       input.metInPerson ? 1 : 0,
+      input.converted ? 1 : 0,
       priority,
       input.promptContext ?? null
     );
@@ -601,14 +612,15 @@ export function updateContact(id: number, fields: UpdateContactInput): Contact {
     dueAt: fields.dueAt !== undefined ? fields.dueAt : current.due_at,
     inTouch: fields.inTouch !== undefined ? (fields.inTouch ? 1 : 0) : current.in_touch,
     metInPerson: fields.metInPerson !== undefined ? (fields.metInPerson ? 1 : 0) : current.met_in_person,
+    converted: fields.converted !== undefined ? (fields.converted ? 1 : 0) : current.converted,
   };
-  const priority = priorityForContact(db, merged.tierId, merged.stageId, merged.followers);
+  const priority = priorityForContact(db, merged.tierId, merged.stageId, merged.followers, !!merged.inTouch, !!merged.converted);
 
   db.prepare(
-    `UPDATE contacts SET tier_id = ?, stage_id = ?, brand = ?, sub_brand = ?, name = ?, role = ?, followers = ?, linkedin = ?, email = ?, last_contacted_at = ?, due_at = ?, in_touch = ?, met_in_person = ?, priority_score = ?, updated_at = datetime('now') WHERE id = ?`
+    `UPDATE contacts SET tier_id = ?, stage_id = ?, brand = ?, sub_brand = ?, name = ?, role = ?, followers = ?, linkedin = ?, email = ?, last_contacted_at = ?, due_at = ?, in_touch = ?, met_in_person = ?, converted = ?, priority_score = ?, updated_at = datetime('now') WHERE id = ?`
   ).run(
     merged.tierId, merged.stageId, merged.brand, merged.subBrand, merged.name, merged.role, merged.followers,
-    merged.linkedin, merged.email, merged.lastContactedAt, merged.dueAt, merged.inTouch, merged.metInPerson, priority, id
+    merged.linkedin, merged.email, merged.lastContactedAt, merged.dueAt, merged.inTouch, merged.metInPerson, merged.converted, priority, id
   );
   return getContact(id)!;
 }
@@ -637,7 +649,7 @@ export function markContacted(id: number): Contact {
   const toStage = nextStage ?? fromStage;
   const newDueAt = nextStage ? new Date(now.getTime() + nextStage.interval_days * 24 * 60 * 60 * 1000).toISOString() : null;
   const tierWeight = current.tier_id ? ((db.prepare("SELECT weight FROM tiers WHERE id = ?").get(current.tier_id) as any)?.weight ?? 0) : 0;
-  const newPriority = computePriority(current.followers, tierWeight, toStage?.weight ?? 0);
+  const newPriority = computePriority(current.followers, tierWeight, toStage?.weight ?? 0, relationshipMultiplier(!!current.in_touch, !!current.converted));
 
   db.prepare(
     "INSERT INTO outreach_events (contact_id, from_stage_id, to_stage_id, prev_due_at, prev_last_contacted_at, prev_priority_score, type) VALUES (?, ?, ?, ?, ?, ?, 'contacted')"

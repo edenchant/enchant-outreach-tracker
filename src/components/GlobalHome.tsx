@@ -10,6 +10,7 @@ import {
   markContacted as apiMarkContacted,
   snoozeContact as apiSnoozeContact,
   undoContact as apiUndoContact,
+  updateContact as apiUpdateContact,
 } from "@/lib/api-client";
 import SegmentTabs from "./SegmentTabs";
 import Waveform from "./Waveform";
@@ -83,6 +84,11 @@ export default function GlobalHome({
   async function handleUndo(id: number) {
     await apiUndoContact(id);
     setToast(null);
+    await refresh();
+  }
+
+  async function handleUpdateFlags(id: number, patch: { inTouch?: boolean; converted?: boolean }) {
+    await apiUpdateContact(id, patch);
     await refresh();
   }
 
@@ -169,7 +175,7 @@ export default function GlobalHome({
         <div className="queue">
           {topToday.map((c, idx) => (
             <ContactCard
-              key={c.id}
+              key={`${c.id}-${c.updatedAt}`}
               contact={c}
               rank={idx + 1}
               stages={configCache[c.segmentSlug]?.stages ?? []}
@@ -179,6 +185,7 @@ export default function GlobalHome({
               onMarkContacted={() => handleMarkContacted(c.id, c.name)}
               onSnooze={() => handleSnooze(c.id, c.name)}
               onDraft={() => setDraftingContact(c)}
+              onUpdateFlags={(patch) => handleUpdateFlags(c.id, patch)}
               segmentLabel={c.segmentName}
             />
           ))}

@@ -40,6 +40,7 @@ export default function ContactCard({
   onMarkContacted,
   onDraft,
   onSnooze,
+  onUpdateFlags,
   segmentLabel,
 }: {
   contact: Contact;
@@ -51,11 +52,13 @@ export default function ContactCard({
   onMarkContacted: () => void;
   onDraft: () => void;
   onSnooze: () => void;
+  onUpdateFlags: (patch: { inTouch?: boolean; converted?: boolean }) => void;
   segmentLabel?: string;
 }) {
   const tl = tierLetter(c.tier?.label);
   const level = signalLevel(rank);
   const [emailCopied, setEmailCopied] = useState(false);
+  const flagClass = c.converted ? "flag-converted" : c.inTouch ? "flag-in-touch" : "";
 
   async function handleCopyEmail() {
     if (!c.email) return;
@@ -65,7 +68,7 @@ export default function ContactCard({
   }
 
   return (
-    <div className={`card status-${c.status}`}>
+    <div className={`card status-${c.status} ${flagClass}`}>
       <div className="rank-meter" aria-hidden="true">
         <div className="bars">
           {[1, 2, 3, 4, 5].map((bar) => (
@@ -90,6 +93,24 @@ export default function ContactCard({
         <div className="meta">
           <b>{c.role || "Unknown role"}</b> · {c.brand || ""}
           {c.subBrand ? ` · ${c.subBrand}` : ""}
+        </div>
+        <div className="flag-checks">
+          <label>
+            <input
+              type="checkbox"
+              defaultChecked={c.inTouch}
+              onChange={(e) => onUpdateFlags({ inTouch: e.target.checked })}
+            />
+            In touch
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              defaultChecked={c.converted}
+              onChange={(e) => onUpdateFlags({ converted: e.target.checked })}
+            />
+            Converted
+          </label>
         </div>
         {expanded && (
           <>

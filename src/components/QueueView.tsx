@@ -9,6 +9,7 @@ import {
   markContacted as apiMarkContacted,
   snoozeContact as apiSnoozeContact,
   undoContact as apiUndoContact,
+  updateContact as apiUpdateContact,
 } from "@/lib/api-client";
 import Link from "next/link";
 import SegmentTabs from "./SegmentTabs";
@@ -104,6 +105,11 @@ export default function QueueView({
     await refresh();
   }
 
+  async function handleUpdateFlags(id: number, patch: { inTouch?: boolean; converted?: boolean }) {
+    await apiUpdateContact(id, patch);
+    await refresh();
+  }
+
   const stageOptions = useMemo(() => stages.slice().sort((a, b) => a.sortOrder - b.sortOrder), [stages]);
   const tierOptions = useMemo(() => tiers.slice().sort((a, b) => a.sortOrder - b.sortOrder), [tiers]);
 
@@ -187,7 +193,7 @@ export default function QueueView({
             <div className="queue">
               {topToday.map((c, idx) => (
                 <ContactCard
-                  key={c.id}
+                  key={`${c.id}-${c.updatedAt}`}
                   contact={c}
                   rank={idx + 1}
                   stages={stages}
@@ -200,6 +206,7 @@ export default function QueueView({
                   onMarkContacted={() => handleMarkContacted(c.id, c.name)}
                   onSnooze={() => handleSnooze(c.id, c.name)}
                   onDraft={() => setDraftingContact(c)}
+                  onUpdateFlags={(patch) => handleUpdateFlags(c.id, patch)}
                 />
               ))}
             </div>
@@ -261,7 +268,7 @@ export default function QueueView({
       <div className="queue">
         {contacts.map((c, idx) => (
           <ContactCard
-            key={c.id}
+            key={`${c.id}-${c.updatedAt}`}
             contact={c}
             rank={idx + 1}
             stages={stages}
@@ -274,6 +281,7 @@ export default function QueueView({
             onMarkContacted={() => handleMarkContacted(c.id, c.name)}
             onSnooze={() => handleSnooze(c.id, c.name)}
             onDraft={() => setDraftingContact(c)}
+            onUpdateFlags={(patch) => handleUpdateFlags(c.id, patch)}
           />
         ))}
       </div>

@@ -40,6 +40,7 @@ export interface Contact {
   dueAt: string | null;
   inTouch: boolean;
   metInPerson: boolean;
+  converted: boolean;
   priorityScore: number;
   effectivePriorityScore: number;
   promptContext: string | null;

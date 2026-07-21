@@ -13,16 +13,26 @@ import {
 
 const TIER_LETTERS = ["S", "A", "B", "C", "D"];
 
-type ScrollColKey = "linkedin" | "email" | "inTouch" | "metInPerson" | "lastContacted" | "stage" | "dueAt";
+type ScrollColKey = "linkedin" | "email" | "inTouch" | "metInPerson" | "converted" | "lastContacted" | "stage" | "dueAt";
 
 const SCROLL_COLUMN_STORAGE_KEY = "dataGridColumnOrder";
-const DEFAULT_COLUMN_ORDER: ScrollColKey[] = ["linkedin", "email", "inTouch", "metInPerson", "lastContacted", "stage", "dueAt"];
+const DEFAULT_COLUMN_ORDER: ScrollColKey[] = [
+  "linkedin",
+  "email",
+  "inTouch",
+  "metInPerson",
+  "converted",
+  "lastContacted",
+  "stage",
+  "dueAt",
+];
 
 const SCROLL_COLUMN_LABELS: Record<ScrollColKey, string> = {
   linkedin: "LinkedIn",
   email: "Email",
   inTouch: "In touch",
   metInPerson: "Met in person",
+  converted: "Converted",
   lastContacted: "Last contact",
   stage: "Stage",
   dueAt: "Next due",
@@ -31,6 +41,7 @@ const SCROLL_COLUMN_LABELS: Record<ScrollColKey, string> = {
 const SCROLL_COLUMN_SORT_KEY: Partial<Record<ScrollColKey, string>> = {
   inTouch: "inTouch",
   metInPerson: "metInPerson",
+  converted: "converted",
   lastContacted: "lastContacted",
   stage: "stage",
   dueAt: "due",
@@ -256,6 +267,12 @@ export default function DataGrid({
         ) : (
           <span className={`bool-pill ${row.metInPerson ? "yes" : "no"}`}>{row.metInPerson ? "Y" : "N"}</span>
         );
+      case "converted":
+        return editMode ? (
+          <input type="checkbox" defaultChecked={row.converted} onChange={(e) => saveField(row, { converted: e.target.checked })} />
+        ) : (
+          <span className={`bool-pill ${row.converted ? "yes" : "no"}`}>{row.converted ? "Y" : "N"}</span>
+        );
       case "lastContacted":
         return editMode ? (
           <input
@@ -390,8 +407,9 @@ export default function DataGrid({
             {rows.map((row) => {
               const cfg = configCache[row.segmentSlug];
               const rowKey = `${row.id}-${row.updatedAt}`;
+              const flagClass = row.converted ? "flag-converted" : row.inTouch ? "flag-in-touch" : "";
               return (
-                <tr key={rowKey}>
+                <tr key={rowKey} className={flagClass}>
                   <td className="sticky-col" style={{ left: fixedColumnLeft(0), width: FIXED_COLUMNS[0].width }}>
                     {row.segmentName}
                   </td>

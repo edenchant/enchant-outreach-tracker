@@ -109,6 +109,10 @@ function migrate(db: DatabaseSync) {
   if (!hasMetInPerson) {
     db.exec("ALTER TABLE contacts ADD COLUMN met_in_person INTEGER NOT NULL DEFAULT 0;");
   }
+  const hasConverted = contactColumns.some((c) => c.name === "converted");
+  if (!hasConverted) {
+    db.exec("ALTER TABLE contacts ADD COLUMN converted INTEGER NOT NULL DEFAULT 0;");
+  }
   const eventColumns = db.prepare("PRAGMA table_info(outreach_events)").all() as Array<{ name: string }>;
   const hasType = eventColumns.some((c) => c.name === "type");
   if (!hasType) {

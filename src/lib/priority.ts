@@ -1,5 +1,19 @@
-export function computePriority(followers: number | null, tierWeight: number, stageWeight: number): number {
-  return Math.round((followers ?? 0) * tierWeight * stageWeight * 1000) / 1000;
+export function computePriority(followers: number | null, tierWeight: number, stageWeight: number, relationshipMultiplier = 1): number {
+  return Math.round((followers ?? 0) * tierWeight * stageWeight * relationshipMultiplier * 1000) / 1000;
+}
+
+// A contact Ed has established contact with, or converted into a strong
+// relationship, gets a small, permanent priority bump — not time-decaying
+// like the brand-history bonus, so it's baked straight into the stored
+// priority_score rather than applied at read time. Converted (a stronger
+// relationship) outranks merely being in touch, so these don't stack.
+export const IN_TOUCH_PRIORITY_MULTIPLIER = 1.02;
+export const CONVERTED_PRIORITY_MULTIPLIER = 1.05;
+
+export function relationshipMultiplier(inTouch: boolean, converted: boolean): number {
+  if (converted) return CONVERTED_PRIORITY_MULTIPLIER;
+  if (inTouch) return IN_TOUCH_PRIORITY_MULTIPLIER;
+  return 1;
 }
 
 export function addDays(date: Date, days: number): Date {
