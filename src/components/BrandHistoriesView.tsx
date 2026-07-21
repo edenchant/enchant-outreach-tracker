@@ -332,7 +332,7 @@ export default function BrandHistoriesView({
               <th>Status</th>
               <th>Source</th>
               <th>Note</th>
-              <th></th>
+              <th className="sticky-col-right"></th>
             </tr>
           </thead>
           <tbody>
@@ -363,7 +363,7 @@ export default function BrandHistoriesView({
                   <td>
                     <input value={editDraft.note} onChange={(e) => setEditDraft({ ...editDraft, note: e.target.value })} />
                   </td>
-                  <td className="data-grid-actions">
+                  <td className="data-grid-actions sticky-col-right">
                     <button className="btn primary" disabled={editSaving} onClick={() => handleEditSave(entry.id)}>
                       {editSaving ? "Saving…" : "Save"}
                     </button>
@@ -393,7 +393,7 @@ export default function BrandHistoriesView({
                       entry.note ?? ""
                     )}
                   </td>
-                  <td className="data-grid-actions">
+                  <td className="data-grid-actions sticky-col-right">
                     {entry.status === "pending" && (
                       <>
                         <button className="btn" onClick={() => handleConfirm(entry.id)}>

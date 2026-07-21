@@ -850,6 +850,22 @@ select {
   font-family: var(--mono);
 }
 
+.sticky-col-right {
+  position: sticky;
+  right: 0;
+  background: var(--panel);
+  z-index: 2;
+  box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.25);
+}
+
+thead .sticky-col-right {
+  z-index: 3;
+}
+
+.data-grid-table tbody tr:focus-within .sticky-col-right {
+  background: var(--accent-soft);
+}
+
 .data-grid-actions {
   display: flex;
   gap: 6px;

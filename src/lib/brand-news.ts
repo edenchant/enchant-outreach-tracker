@@ -51,6 +51,48 @@ interface NewsHeadline {
   pubDate: string | null;
 }
 
+// NewsData.io's own query can only match the brand name, so it returns a lot
+// of noise (sponsorships, stock moves, unrelated executive quotes, generic
+// mentions) — cheaper and more reliable to gate on these specific phrases
+// ourselves before spending a Claude call classifying anything. Short,
+// acronym-like entries are matched as whole words only (so "cmo" doesn't
+// match inside an unrelated longer word); multi-word phrases are matched as
+// a plain substring.
+const RELEVANCE_KEYWORDS = [
+  // Brand Refresh / Rebrand
+  "rebrand",
+  "re-brand",
+  "brand refresh",
+  "brand relaunch",
+  "new visual identity",
+  "new logo",
+  // New CMO
+  "chief marketing officer",
+  "cmo",
+  // New Head of Brand
+  "head of brand",
+  "brand director",
+  // Major ATL Campaign
+  "new campaign",
+  "ad campaign",
+  "advertising campaign",
+  "new advert",
+  "new advertisement",
+  "new commercial",
+  "launches campaign",
+  "unveils campaign",
+];
+
+function isRelevantHeadline(h: NewsHeadline): boolean {
+  const text = `${h.title} ${h.description ?? ""}`;
+  return RELEVANCE_KEYWORDS.some((keyword) => {
+    if (!keyword.includes(" ") && keyword.length <= 4) {
+      return new RegExp(`\\b${keyword}\\b`, "i").test(text);
+    }
+    return text.toLowerCase().includes(keyword.toLowerCase());
+  });
+}
+
 async function fetchNewsForBrand(brand: string, apiKey: string): Promise<NewsHeadline[]> {
   const url = new URL("https://newsdata.io/api/1/latest");
   url.searchParams.set("apikey", apiKey);
@@ -87,9 +129,10 @@ async function classifyHeadlines(brand: string, headlines: NewsHeadline[]): Prom
     .map((h, i) => `${i}. "${h.title}"${h.description ? ` — ${h.description}` : ""}`)
     .join("\n");
 
-  const prompt = `We're monitoring news coverage of the brand "${brand}" for our outreach tracker. For each numbered headline below, decide:
+  const prompt = `We're monitoring news coverage of the brand "${brand}" for our outreach tracker. These headlines already passed a keyword pre-filter, but that filter is loose — most will still turn out irrelevant. For each numbered headline below, decide:
 1. Is this genuinely about "${brand}" the brand/company (not an unrelated use of the same word)?
-2. If relevant, does it report one of exactly these four event types: "Brand Refresh / Rebrand" (a rebrand, new visual identity, or brand refresh), "New Head of Brand" (a new head of brand, brand director, or similarly-titled senior brand leader appointed — but not a CMO), "New CMO" (a new chief marketing officer or most senior marketing leader appointed), or "Major ATL Campaign" (a new major above-the-line advertising campaign launch)?
+2. Does it report a specific, genuinely new, dated event — not a retrospective, opinion piece, roundup, unrelated announcement that merely mentions the brand in passing, or generic commentary about the brand's marketing?
+3. If both of the above are true, does it report one of exactly these four event types: "Brand Refresh / Rebrand" (a rebrand, new visual identity, or brand refresh actually being launched), "New Head of Brand" (a new head of brand, brand director, or similarly-titled senior brand leader appointed — but not a CMO), "New CMO" (a new chief marketing officer or most senior marketing leader appointed), or "Major ATL Campaign" (a new major above-the-line advertising campaign actually launching)?
 
 Headlines:
 ${list}
@@ -97,7 +140,7 @@ ${list}
 Reply with ONLY a JSON array, one object per headline, in this exact shape, no other text:
 [{"index": 0, "relevant": true, "eventType": "New CMO", "reason": "one short sentence"}]
 
-Use eventType: null and relevant: false for anything that doesn't clearly match one of the four types.`;
+Default to relevant: false and eventType: null unless the headline clearly and specifically matches one of the four types — when in doubt, exclude it.`;
 
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
@@ -152,11 +195,12 @@ export async function scanBrandNews(batchSize: number): Promise<ScanResult> {
     const brand = batch[i];
     try {
       const headlines = await fetchNewsForBrand(brand, newsApiKey);
-      if (headlines.length > 0) {
-        const classifications = await classifyHeadlines(brand, headlines);
+      const relevantHeadlines = headlines.filter(isRelevantHeadline);
+      if (relevantHeadlines.length > 0) {
+        const classifications = await classifyHeadlines(brand, relevantHeadlines);
         for (const c of classifications) {
           if (!c.relevant || !c.eventType) continue;
-          const headline = headlines[c.index];
+          const headline = relevantHeadlines[c.index];
           if (!headline) continue;
 
           const existing = findRecentSimilarBrandEvent(brand, c.eventType, sinceDate);
