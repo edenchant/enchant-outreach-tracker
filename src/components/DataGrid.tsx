@@ -47,6 +47,24 @@ const SCROLL_COLUMN_SORT_KEY: Partial<Record<ScrollColKey, string>> = {
   dueAt: "due",
 };
 
+// The table uses table-layout: fixed (see globals.css) so that stacked
+// sticky columns don't drift out of sync with their computed left offsets —
+// table-layout: auto sizes columns by content, which silently breaks the
+// left-offset math the moment any cell's content is wider than expected.
+// Fixed layout means every column, including these, needs an explicit width.
+const SCROLL_COLUMN_WIDTHS: Record<ScrollColKey, number> = {
+  linkedin: 100,
+  email: 96,
+  inTouch: 74,
+  metInPerson: 96,
+  converted: 84,
+  lastContacted: 118,
+  stage: 140,
+  dueAt: 90,
+};
+
+const ACTIONS_COLUMN_WIDTH = 90;
+
 // Fixed, non-reorderable identifying columns, pinned to the left of the
 // horizontally-scrolling area. Widths are explicit so left offsets can be
 // computed for position: sticky.
@@ -358,7 +376,7 @@ export default function DataGrid({
       {saveError && <div className="error-text">{saveError}</div>}
 
       <div className="data-grid-scroll">
-        <table className="settings-table data-grid-table">
+        <table className="settings-table data-grid-table contact-grid-table">
           <thead>
             <tr>
               {FIXED_COLUMNS.map((col, idx) => (
@@ -376,6 +394,7 @@ export default function DataGrid({
                 <th
                   key={key}
                   className={`sortable draggable-col ${dragOverKey === key ? "drag-over" : ""}`}
+                  style={{ width: SCROLL_COLUMN_WIDTHS[key] }}
                   draggable
                   onClick={() => toggleSort(SCROLL_COLUMN_SORT_KEY[key])}
                   onDragStart={() => {
@@ -400,7 +419,7 @@ export default function DataGrid({
                   {sortIndicator(SCROLL_COLUMN_SORT_KEY[key])}
                 </th>
               ))}
-              <th></th>
+              <th style={{ width: ACTIONS_COLUMN_WIDTH }}></th>
             </tr>
           </thead>
           <tbody>
@@ -475,9 +494,11 @@ export default function DataGrid({
                     )}
                   </td>
                   {columnOrder.map((key) => (
-                    <td key={key}>{renderScrollCell(row, key, cfg)}</td>
+                    <td key={key} style={{ width: SCROLL_COLUMN_WIDTHS[key] }}>
+                      {renderScrollCell(row, key, cfg)}
+                    </td>
                   ))}
-                  <td className="data-grid-actions">
+                  <td className="data-grid-actions" style={{ width: ACTIONS_COLUMN_WIDTH }}>
                     {editMode && (
                       <button className="btn" onClick={() => handleDelete(row.id)}>
                         Delete

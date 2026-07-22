@@ -856,6 +856,25 @@ select {
   overflow: visible;
 }
 
+/* Only the full contact database grid has multiple stacked sticky-left
+   columns, whose left offsets are computed in JS as a running sum of pixel
+   widths. table-layout: auto (the default) sizes each column by its widest
+   cell instead of the declared width, which silently invalidates that sum
+   the moment any cell's content is wider than expected — the sticky columns
+   then drift out of alignment as you scroll. Fixed layout makes every column
+   obey its declared width exactly. Brand Histories' single sticky column has
+   no such offset math to protect and still wants its Note column to size
+   naturally, so this is scoped here rather than on .data-grid-table itself. */
+.contact-grid-table {
+  table-layout: fixed;
+}
+
+.contact-grid-table th,
+.contact-grid-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .data-grid-table th.sortable {
   cursor: pointer;
   user-select: none;
