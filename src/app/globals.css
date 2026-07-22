@@ -842,6 +842,18 @@ select {
   border: none;
   border-radius: 0;
   white-space: nowrap;
+  /* position: sticky on <td>/<th> doesn't work with border-collapse: collapse
+     (inherited from .settings-table) — separate + zero spacing keeps the same
+     visual look while letting the sticky columns actually stick. */
+  border-collapse: separate;
+  border-spacing: 0;
+  /* .settings-table also sets overflow: hidden on the <table> itself (to clip
+     its rounded corners) — that makes the table its own scroll container for
+     sticky-positioning purposes, so sticky cells stick to the table (which
+     scrolls as a whole) instead of the actually-scrolling .data-grid-scroll
+     wrapper. That wrapper already clips to the same rounded corners, so this
+     is safe to undo here. */
+  overflow: visible;
 }
 
 .data-grid-table th.sortable {
@@ -888,30 +900,6 @@ select {
   font-size: 11px;
   color: var(--ink-soft);
   font-family: var(--mono);
-}
-
-.sticky-col-right {
-  position: sticky;
-  right: 0;
-  background: var(--panel);
-  z-index: 2;
-  box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.25);
-}
-
-thead .sticky-col-right {
-  z-index: 3;
-}
-
-.data-grid-table tbody tr.flag-in-touch .sticky-col-right {
-  background: var(--silver-soft);
-}
-
-.data-grid-table tbody tr.flag-converted .sticky-col-right {
-  background: var(--gold-soft);
-}
-
-.data-grid-table tbody tr:focus-within .sticky-col-right {
-  background: var(--accent-soft);
 }
 
 .data-grid-actions {

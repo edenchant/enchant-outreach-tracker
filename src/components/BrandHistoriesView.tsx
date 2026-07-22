@@ -326,19 +326,28 @@ export default function BrandHistoriesView({
         <table className="settings-table data-grid-table">
           <thead>
             <tr>
+              <th className="sticky-col sticky-col-last" style={{ left: 0 }}></th>
               <th>Date</th>
               <th>Brand</th>
               <th>Event type</th>
               <th>Status</th>
               <th>Source</th>
               <th>Note</th>
-              <th className="sticky-col-right"></th>
             </tr>
           </thead>
           <tbody>
             {entries.map((entry) =>
               editingId === entry.id ? (
                 <tr key={entry.id}>
+                  <td className="data-grid-actions sticky-col sticky-col-last brand-history-actions" style={{ left: 0 }}>
+                    <button className="btn btn-sm primary" disabled={editSaving} onClick={() => handleEditSave(entry.id)}>
+                      {editSaving ? "Saving…" : "Save"}
+                    </button>
+                    <button className="btn btn-sm" disabled={editSaving} onClick={cancelEdit}>
+                      Cancel
+                    </button>
+                    {editError && <div className="error-text">{editError}</div>}
+                  </td>
                   <td>
                     <input type="date" value={editDraft.date} onChange={(e) => setEditDraft({ ...editDraft, date: e.target.value })} />
                   </td>
@@ -363,18 +372,27 @@ export default function BrandHistoriesView({
                   <td>
                     <input value={editDraft.note} onChange={(e) => setEditDraft({ ...editDraft, note: e.target.value })} />
                   </td>
-                  <td className="data-grid-actions sticky-col-right brand-history-actions">
-                    <button className="btn btn-sm primary" disabled={editSaving} onClick={() => handleEditSave(entry.id)}>
-                      {editSaving ? "Saving…" : "Save"}
-                    </button>
-                    <button className="btn btn-sm" disabled={editSaving} onClick={cancelEdit}>
-                      Cancel
-                    </button>
-                    {editError && <div className="error-text">{editError}</div>}
-                  </td>
                 </tr>
               ) : (
                 <tr key={entry.id}>
+                  <td className="data-grid-actions sticky-col sticky-col-last brand-history-actions" style={{ left: 0 }}>
+                    {entry.status === "pending" && (
+                      <>
+                        <button className="btn btn-sm" onClick={() => handleConfirm(entry.id)}>
+                          Confirm
+                        </button>
+                        <button className="btn btn-sm" onClick={() => handleDismiss(entry.id)}>
+                          Dismiss
+                        </button>
+                      </>
+                    )}
+                    <button className="btn btn-sm" onClick={() => startEdit(entry)}>
+                      Edit
+                    </button>
+                    <button className="btn btn-sm" onClick={() => handleDelete(entry.id)}>
+                      Delete
+                    </button>
+                  </td>
                   <td>{fmtDate(entry.date)}</td>
                   <td>{entry.brand}</td>
                   <td>{entry.eventType}</td>
@@ -392,24 +410,6 @@ export default function BrandHistoriesView({
                     ) : (
                       entry.note ?? ""
                     )}
-                  </td>
-                  <td className="data-grid-actions sticky-col-right brand-history-actions">
-                    {entry.status === "pending" && (
-                      <>
-                        <button className="btn btn-sm" onClick={() => handleConfirm(entry.id)}>
-                          Confirm
-                        </button>
-                        <button className="btn btn-sm" onClick={() => handleDismiss(entry.id)}>
-                          Dismiss
-                        </button>
-                      </>
-                    )}
-                    <button className="btn btn-sm" onClick={() => startEdit(entry)}>
-                      Edit
-                    </button>
-                    <button className="btn btn-sm" onClick={() => handleDelete(entry.id)}>
-                      Delete
-                    </button>
                   </td>
                 </tr>
               )
