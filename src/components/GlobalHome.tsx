@@ -198,9 +198,9 @@ export default function GlobalHome({
 
       <div className="footnote">
         Combined view across {segments.length} segments · {stats.total} contacts total. Jump into a segment above for
-        its full queue, filters, and pipeline settings. Once someone at a brand is marked contacted, the Top 10 won&apos;t
-        recommend anyone else at that brand until tomorrow — the full queue and data grid still show everyone if you want
-        to reach a second person there anyway.
+        its full queue, filters, and pipeline settings. The Top 10 only ever shows one contact per brand at a time, and
+        once someone at a brand is marked contacted, it won&apos;t recommend anyone else there until tomorrow — the full
+        queue and data grid still show everyone if you want to reach a second person there anyway.
       </div>
 
       {editing && (

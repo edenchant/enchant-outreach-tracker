@@ -919,6 +919,17 @@ thead .sticky-col-right {
   gap: 6px;
 }
 
+.btn-sm {
+  padding: 5px 9px;
+  font-size: 11.5px;
+  border-radius: 8px;
+}
+
+.brand-history-actions {
+  flex-wrap: wrap;
+  max-width: 128px;
+}
+
 .data-grid-embed {
   margin-bottom: 24px;
 }

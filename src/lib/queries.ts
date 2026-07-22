@@ -458,6 +458,24 @@ function brandsContactedToday(): Set<string> {
   return new Set(rows.map((r) => r.brand as string));
 }
 
+// Keeps at most one contact per brand — callers already sort by priority
+// descending first, so this keeps each brand's highest-priority contact and
+// drops the rest. Contacts with no brand on file are never deduped against
+// each other. Scoped to the Top 10 recommendation views only, same as
+// brandsContactedToday above.
+function dedupeByBrand<T extends { brand: string | null }>(contacts: T[]): T[] {
+  const seenBrands = new Set<string>();
+  const result: T[] = [];
+  for (const c of contacts) {
+    if (c.brand) {
+      if (seenBrands.has(c.brand)) continue;
+      seenBrands.add(c.brand);
+    }
+    result.push(c);
+  }
+  return result;
+}
+
 export function getTopToday(segmentId: number, limit = 10): Contact[] {
   const db = getDb();
   const now = new Date();
@@ -466,10 +484,11 @@ export function getTopToday(segmentId: number, limit = 10): Contact[] {
   const contactedBrands = brandsContactedToday();
   const contacts = rows.map((r) => applyBrandBonus(toContact(r, now), brandMap, now));
   contacts.sort((a, b) => b.effectivePriorityScore - a.effectivePriorityScore);
-  return contacts
-    .filter((c) => c.status === "overdue" || c.status === "today")
-    .filter((c) => !c.brand || !contactedBrands.has(c.brand))
-    .slice(0, limit);
+  return dedupeByBrand(
+    contacts
+      .filter((c) => c.status === "overdue" || c.status === "today")
+      .filter((c) => !c.brand || !contactedBrands.has(c.brand))
+  ).slice(0, limit);
 }
 
 const GLOBAL_CONTACT_SELECT = `
@@ -518,10 +537,11 @@ export function getGlobalTopToday(limit = 10): GridContact[] {
     )
   );
   contacts.sort((a, b) => b.effectivePriorityScore - a.effectivePriorityScore);
-  return contacts
-    .filter((c) => c.status === "overdue" || c.status === "today")
-    .filter((c) => !c.brand || !contactedBrands.has(c.brand))
-    .slice(0, limit);
+  return dedupeByBrand(
+    contacts
+      .filter((c) => c.status === "overdue" || c.status === "today")
+      .filter((c) => !c.brand || !contactedBrands.has(c.brand))
+  ).slice(0, limit);
 }
 
 export interface NewContactInput {
