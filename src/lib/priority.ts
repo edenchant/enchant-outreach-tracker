@@ -1,5 +1,11 @@
+// Contacts without a recorded LinkedIn follower count would otherwise score
+// exactly 0 and never surface in any priority-ordered view, regardless of
+// tier or stage — treating them as a typical/average LinkedIn user (~500
+// followers) instead means missing data no longer silently zeroes them out.
+export const DEFAULT_FOLLOWERS = 500;
+
 export function computePriority(followers: number | null, tierWeight: number, stageWeight: number, relationshipMultiplier = 1): number {
-  return Math.round((followers ?? 0) * tierWeight * stageWeight * relationshipMultiplier * 1000) / 1000;
+  return Math.round((followers ?? DEFAULT_FOLLOWERS) * tierWeight * stageWeight * relationshipMultiplier * 1000) / 1000;
 }
 
 // A contact Ed has established contact with, or converted into a strong

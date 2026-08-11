@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import fs from "node:fs";
+import { computePriority, relationshipMultiplier } from "./priority";
 
 const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "app.db");
 
@@ -117,6 +118,35 @@ function migrate(db: DatabaseSync) {
   const hasType = eventColumns.some((c) => c.name === "type");
   if (!hasType) {
     db.exec("ALTER TABLE outreach_events ADD COLUMN type TEXT NOT NULL DEFAULT 'contacted';");
+  }
+
+  backfillNullFollowerPriorities(db);
+}
+
+// Contacts with no recorded follower count previously scored exactly 0
+// (regardless of tier/stage) and never surfaced in any priority-ordered
+// view. computePriority() now defaults missing followers to a typical
+// LinkedIn user's count instead of 0 — this brings existing rows in line
+// with that, every startup. Scoped to followers IS NULL and cheap even for
+// thousands of rows, so it's safe to just re-run rather than track whether
+// it's "already happened" with a separate flag.
+function backfillNullFollowerPriorities(db: DatabaseSync) {
+  const rows = db
+    .prepare(
+      `SELECT c.id, c.followers, c.in_touch, c.converted,
+        COALESCE(t.weight, 0) as tier_weight, COALESCE(s.weight, 0) as stage_weight
+       FROM contacts c
+       LEFT JOIN tiers t ON t.id = c.tier_id
+       LEFT JOIN stages s ON s.id = c.stage_id
+       WHERE c.followers IS NULL`
+    )
+    .all() as Array<{ id: number; followers: number | null; in_touch: number; converted: number; tier_weight: number; stage_weight: number }>;
+  if (rows.length === 0) return;
+  const update = db.prepare("UPDATE contacts SET priority_score = ? WHERE id = ?");
+  for (const row of rows) {
+    const mult = relationshipMultiplier(!!row.in_touch, !!row.converted);
+    const priority = computePriority(row.followers, row.tier_weight, row.stage_weight, mult);
+    update.run(priority, row.id);
   }
 }
 
