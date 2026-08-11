@@ -126,6 +126,9 @@ export default function QueueView({
           <Link href="/" className="btn">
             Data grid
           </Link>
+          <Link href="/linkedin-queue" className="btn">
+            LinkedIn queue
+          </Link>
           <Link href="/brand-histories" className="btn">
             Brand histories
           </Link>

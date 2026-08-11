@@ -4,8 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Contact, GridContact, Segment, Stage, Tier } from "@/lib/types";
 import {
-  fetchGlobalStats,
-  fetchGlobalTopToday,
+  fetchLinkedInQueue,
   fetchSegmentConfig,
   markContacted as apiMarkContacted,
   snoozeContact as apiSnoozeContact,
@@ -18,37 +17,20 @@ import StatMeter from "./StatMeter";
 import ContactCard from "./ContactCard";
 import ContactFormModal from "./ContactFormModal";
 import DraftModal from "./DraftModal";
-import DataGrid from "./DataGrid";
 
-interface Stats {
-  overdue: number;
-  today: number;
-  upcoming: number;
-  total: number;
-  contactedThisWeek: number;
-}
-
-function weekCountClass(n: number): string {
-  if (n < 10) return "low";
-  if (n < 50) return "mid";
-  return "high";
-}
-
-export default function GlobalHome({
+export default function LinkedInQueueView({
   segments,
-  initialStats,
-  initialTopToday,
-  initialGridRows,
-  initialGridTotal,
+  initialSuggestions,
+  initialAddedThisWeek,
+  weeklyLimit,
 }: {
   segments: Segment[];
-  initialStats: Stats;
-  initialTopToday: GridContact[];
-  initialGridRows: GridContact[];
-  initialGridTotal: number;
+  initialSuggestions: GridContact[];
+  initialAddedThisWeek: number;
+  weeklyLimit: number;
 }) {
-  const [stats, setStats] = useState<Stats>(initialStats);
-  const [topToday, setTopToday] = useState<GridContact[]>(initialTopToday);
+  const [suggestions, setSuggestions] = useState<GridContact[]>(initialSuggestions);
+  const [addedThisWeek, setAddedThisWeek] = useState(initialAddedThisWeek);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ id: number; name: string; action: "contacted" | "snoozed" } | null>(null);
   const [draftingContact, setDraftingContact] = useState<Contact | null>(null);
@@ -56,9 +38,9 @@ export default function GlobalHome({
   const [configCache, setConfigCache] = useState<Record<string, { tiers: Tier[]; stages: Stage[] }>>({});
 
   async function refresh() {
-    const [s, t] = await Promise.all([fetchGlobalStats(), fetchGlobalTopToday()]);
-    setStats(s);
-    setTopToday(t);
+    const q = await fetchLinkedInQueue();
+    setSuggestions(q.suggestions);
+    setAddedThisWeek(q.addedThisWeek);
   }
 
   async function ensureConfig(slug: string) {
@@ -69,7 +51,7 @@ export default function GlobalHome({
     return entry;
   }
 
-  async function handleMarkContacted(id: number, name: string) {
+  async function handleAdded(id: number, name: string) {
     await apiMarkContacted(id);
     setToast({ id, name, action: "contacted" });
     await refresh();
@@ -106,25 +88,24 @@ export default function GlobalHome({
     setExpandedId(contact.id);
   }
 
+  const remaining = Math.max(weeklyLimit - addedThisWeek, 0);
+
   return (
     <div className="wrap">
       <SegmentTabs segments={segments} activeSlug="" />
 
       <header className="top">
         <div>
-          <p className="eyebrow">Enchant · all segments</p>
-          <h1>Today&apos;s Priority Queue</h1>
+          <p className="eyebrow">Enchant · LinkedIn add queue</p>
+          <h1>LinkedIn Add Queue</h1>
         </div>
         <div className="top-actions">
-          <Link href="/linkedin-queue" className="btn">
-            LinkedIn queue
-          </Link>
           <Link href="/brand-histories" className="btn">
             Brand histories
           </Link>
-          <div className="today-date" suppressHydrationWarning>
-            {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          </div>
+          <Link href="/" className="btn">
+            ← Back to queue
+          </Link>
         </div>
         <Waveform />
       </header>
@@ -133,7 +114,7 @@ export default function GlobalHome({
         <div className="history-panel" style={{ marginBottom: 14 }}>
           {toast.action === "contacted" ? (
             <>
-              Marked <b>{toast.name}</b> as contacted.
+              Added <b>{toast.name}</b> on LinkedIn.
             </>
           ) : (
             <>
@@ -147,36 +128,32 @@ export default function GlobalHome({
       )}
 
       <div className="stats">
-        <div className="stat overdue">
-          <div className="num">{stats.overdue}</div>
-          <div className="label">Overdue</div>
-          <StatMeter value={stats.overdue} total={stats.total} />
+        <div className="stat total" style={{ gridColumn: "span 2" }}>
+          <div className="num">
+            {addedThisWeek} / {weeklyLimit}
+          </div>
+          <div className="label">Added on LinkedIn this week</div>
+          <StatMeter value={addedThisWeek} total={weeklyLimit} />
         </div>
-        <div className="stat week">
-          <div className={`num ${weekCountClass(stats.contactedThisWeek)}`}>{stats.contactedThisWeek}</div>
-          <div className="label">Contacted this week</div>
-        </div>
-        <div className="stat upcoming">
-          <div className="num">{stats.upcoming}</div>
-          <div className="label">Upcoming (7d)</div>
-          <StatMeter value={stats.upcoming} total={stats.total} />
-        </div>
-        <div className="stat total">
-          <div className="num">{stats.total}</div>
-          <div className="label">Total contacts</div>
-          <StatMeter value={stats.total} total={stats.total} />
+        <div className="stat total" style={{ gridColumn: "span 2" }}>
+          <div className="num">{remaining}</div>
+          <div className="label">Remaining this week&apos;s allowance</div>
+          <StatMeter value={remaining} total={weeklyLimit} />
         </div>
       </div>
 
       <div className="top-ten">
         <div className="top-ten-header">
           <h2>
-            🎯 Today&apos;s Top {topToday.length}
-            <span className="top-ten-sub">Highest-priority overdue &amp; due-today contacts, across every segment</span>
+            🔗 Suggested adds
+            <span className="top-ten-sub">
+              Highest-priority contacts with no due date yet — the outreach process hasn&apos;t started for them, so
+              adding them on LinkedIn is the first step
+            </span>
           </h2>
         </div>
         <div className="queue">
-          {topToday.map((c, idx) => (
+          {suggestions.map((c, idx) => (
             <ContactCard
               key={`${c.id}-${c.updatedAt}`}
               contact={c}
@@ -185,25 +162,29 @@ export default function GlobalHome({
               expanded={expandedId === c.id}
               onToggleExpand={() => handleToggleExpand(c)}
               onEdit={() => handleEdit(c)}
-              onMarkContacted={() => handleMarkContacted(c.id, c.name)}
+              onMarkContacted={() => handleAdded(c.id, c.name)}
               onSnooze={() => handleSnooze(c.id, c.name)}
               onDraft={() => setDraftingContact(c)}
               onUpdateFlags={(patch) => handleUpdateFlags(c.id, patch)}
               segmentLabel={c.segmentName}
+              contactedLabel="Added on LinkedIn ✓"
             />
           ))}
         </div>
-        {topToday.length === 0 && <div className="empty">Nothing overdue or due today — nice work.</div>}
+        {suggestions.length === 0 && remaining === 0 && (
+          <div className="empty">You&apos;ve used this week&apos;s LinkedIn allowance — check back after it resets on Monday.</div>
+        )}
+        {suggestions.length === 0 && remaining > 0 && (
+          <div className="empty">No contacts waiting to be added — everyone in the database has a due date already.</div>
+        )}
       </div>
 
-      <h2 className="data-grid-heading">Full contact database</h2>
-      <DataGrid segments={segments} initialRows={initialGridRows} initialTotal={initialGridTotal} />
-
       <div className="footnote">
-        Combined view across {segments.length} segments · {stats.total} contacts total. Jump into a segment above for
-        its full queue, filters, and pipeline settings. The Top 10 only ever shows one contact per brand at a time, and
-        once someone at a brand is marked contacted, it won&apos;t recommend anyone else there until tomorrow — the full
-        queue and data grid still show everyone if you want to reach a second person there anyway.
+        LinkedIn caps outgoing connection requests at {weeklyLimit} a week, resetting Monday. This list shows the
+        highest-priority contacts who don&apos;t have a due date yet — meaning the outreach process hasn&apos;t started
+        for them — capped to whatever&apos;s left of this week&apos;s allowance. Click &quot;Added on LinkedIn&quot; once
+        you&apos;ve sent the request; that gives them a due date and moves them into the regular queue. Snoozing instead
+        defers them 30 days without using up any of the allowance.
       </div>
 
       {editing && (

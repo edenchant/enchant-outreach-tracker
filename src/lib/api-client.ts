@@ -52,6 +52,17 @@ export async function fetchGlobalTopToday(): Promise<GridContact[]> {
   return data.contacts;
 }
 
+export interface LinkedInQueueDTO {
+  suggestions: GridContact[];
+  addedThisWeek: number;
+  weeklyLimit: number;
+}
+
+export async function fetchLinkedInQueue(): Promise<LinkedInQueueDTO> {
+  const res = await fetch(`/api/linkedin-queue`);
+  return json<LinkedInQueueDTO>(res);
+}
+
 export async function markContacted(id: number): Promise<Contact> {
   const res = await fetch(`/api/contacts/${id}/contact`, { method: "POST" });
   const data = await json<{ contact: Contact }>(res);

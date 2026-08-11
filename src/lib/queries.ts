@@ -519,6 +519,47 @@ export function getGlobalStats(): ContactStats {
   };
 }
 
+// LinkedIn caps outgoing connection requests at 100/week, and the first
+// pipeline step for any contact is always adding them there — so contacts
+// with no due date yet (the process hasn't started for them at all) are
+// exactly the pool worth surfacing here, most-important first, up to
+// whatever's left of this week's allowance.
+export const WEEKLY_LINKEDIN_ADD_LIMIT = 100;
+
+// A contact's due date is set for the first time the moment they're marked
+// contacted while it was previously null — regardless of which screen that
+// happened from — so prev_due_at IS NULL on the outreach event is a precise,
+// retroactive signal for "this was a LinkedIn add," with no separate event
+// type or dedicated endpoint needed.
+export function getLinkedInAddsThisWeek(): number {
+  const db = getDb();
+  const weekStart = startOfThisWeekISO();
+  const row = db
+    .prepare(`SELECT COUNT(*) as n FROM outreach_events WHERE type = 'contacted' AND prev_due_at IS NULL AND date(contacted_at) >= date(?)`)
+    .get(weekStart) as any;
+  return row.n;
+}
+
+export function getSuggestedLinkedInAdds(limit?: number): GridContact[] {
+  const db = getDb();
+  const now = new Date();
+  const rows = db.prepare(`${GLOBAL_CONTACT_SELECT} WHERE c.archived = 0 AND c.due_at IS NULL ORDER BY c.priority_score DESC`).all();
+  const brandMap = getBrandEventMap();
+  const contacts: GridContact[] = rows.map((r: any) =>
+    applyBrandBonus(
+      {
+        ...toContact(r, now),
+        segmentName: r.segment_name,
+        segmentSlug: r.segment_slug,
+      },
+      brandMap,
+      now
+    )
+  );
+  contacts.sort((a, b) => b.effectivePriorityScore - a.effectivePriorityScore);
+  return typeof limit === "number" ? contacts.slice(0, limit) : contacts;
+}
+
 export function getGlobalTopToday(limit = 10): GridContact[] {
   const db = getDb();
   const now = new Date();

@@ -42,6 +42,7 @@ export default function ContactCard({
   onSnooze,
   onUpdateFlags,
   segmentLabel,
+  contactedLabel = "Mark contacted",
 }: {
   contact: Contact;
   rank: number;
@@ -54,6 +55,7 @@ export default function ContactCard({
   onSnooze: () => void;
   onUpdateFlags: (patch: { inTouch?: boolean; converted?: boolean }) => void;
   segmentLabel?: string;
+  contactedLabel?: string;
 }) {
   const tl = tierLetter(c.tier?.label);
   const level = signalLevel(rank);
@@ -170,7 +172,7 @@ export default function ContactCard({
           )}
         </div>
         <button className="contacted" onClick={onMarkContacted}>
-          Mark contacted
+          {contactedLabel}
         </button>
       </div>
     </div>
