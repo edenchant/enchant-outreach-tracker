@@ -543,13 +543,18 @@ export function getLinkedInAddsThisWeek(): number {
 export function getSuggestedLinkedInAdds(limit?: number): GridContact[] {
   const db = getDb();
   const now = new Date();
-  // stage_id IS NULL means outreach genuinely hasn't started for this
-  // contact yet. due_at IS NULL alone isn't enough: a contact who has
-  // completed their whole pipeline (reached a terminal stage) can also
-  // have a null due_at, and would otherwise keep resurfacing here as if
-  // they were never connected with.
+  // last_contacted_at IS NULL means outreach has genuinely never happened
+  // for this contact — markContacted() unconditionally stamps it on every
+  // call, so once a contact has been actioned even once, it can never
+  // match this again. due_at IS NULL alone isn't enough (a contact who
+  // completed their whole pipeline can also have a null due_at), and
+  // neither is stage_id IS NULL: imported contacts can already carry a
+  // "LinkedIn Add" stage_id (their next action) despite never having been
+  // contacted, so filtering on stage would wrongly hide them.
   const rows = db
-    .prepare(`${GLOBAL_CONTACT_SELECT} WHERE c.archived = 0 AND c.due_at IS NULL AND c.stage_id IS NULL ORDER BY c.priority_score DESC`)
+    .prepare(
+      `${GLOBAL_CONTACT_SELECT} WHERE c.archived = 0 AND c.due_at IS NULL AND c.last_contacted_at IS NULL ORDER BY c.priority_score DESC`
+    )
     .all();
   const brandMap = getBrandEventMap();
   const contacts: GridContact[] = rows.map((r: any) =>
