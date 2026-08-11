@@ -4,8 +4,8 @@ import { useState } from "react";
 import type { Contact, Stage } from "@/lib/types";
 import HistoryPanel from "./HistoryPanel";
 
-function relTime(dueAt: string | null): string {
-  if (!dueAt) return "No due date";
+function relTime(dueAt: string | null, noDueLabel: string): string {
+  if (!dueAt) return noDueLabel;
   const diffMs = new Date(dueAt).getTime() - Date.now();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
   if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
@@ -44,6 +44,9 @@ export default function ContactCard({
   segmentLabel,
   contactedLabel = "Mark contacted",
   contactedBusy = false,
+  confirmed = false,
+  confirmedLabel = "✓ Done",
+  noDueLabel = "No due date",
 }: {
   contact: Contact;
   rank: number;
@@ -58,6 +61,9 @@ export default function ContactCard({
   segmentLabel?: string;
   contactedLabel?: string;
   contactedBusy?: boolean;
+  confirmed?: boolean;
+  confirmedLabel?: string;
+  noDueLabel?: string;
 }) {
   const tl = tierLetter(c.tier?.label);
   const level = signalLevel(rank);
@@ -72,7 +78,7 @@ export default function ContactCard({
   }
 
   return (
-    <div className={`card status-${c.status} ${flagClass}`}>
+    <div className={`card status-${c.status} ${flagClass} ${confirmed ? "done" : ""}`}>
       <div className="rank-meter" aria-hidden="true">
         <div className="bars">
           {[1, 2, 3, 4, 5].map((bar) => (
@@ -129,7 +135,7 @@ export default function ContactCard({
       </div>
       <div className="stage-pill">{c.stage?.name ?? "—"}</div>
       <div className="due-info">
-        <div className="rel">{relTime(c.dueAt)}</div>
+        <div className="rel">{relTime(c.dueAt, noDueLabel)}</div>
         <div className="score">
           priority {c.effectivePriorityScore.toFixed(1)}
           {c.brandBonus && c.effectivePriorityScore > c.priorityScore ? ` (base ${c.priorityScore.toFixed(1)})` : ""}
@@ -173,8 +179,8 @@ export default function ContactCard({
             </span>
           )}
         </div>
-        <button className="contacted" onClick={onMarkContacted} disabled={contactedBusy}>
-          {contactedBusy ? "Saving…" : contactedLabel}
+        <button className={`contacted ${confirmed ? "done-state" : ""}`} onClick={onMarkContacted} disabled={contactedBusy || confirmed}>
+          {confirmed ? confirmedLabel : contactedBusy ? "Saving…" : contactedLabel}
         </button>
       </div>
     </div>

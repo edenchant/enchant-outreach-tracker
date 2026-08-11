@@ -37,6 +37,7 @@ export default function LinkedInQueueView({
   const [editing, setEditing] = useState<{ contact: GridContact; tiers: Tier[]; stages: Stage[] } | null>(null);
   const [configCache, setConfigCache] = useState<Record<string, { tiers: Tier[]; stages: Stage[] }>>({});
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [confirmedIds, setConfirmedIds] = useState<Set<number>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
 
   async function refresh() {
@@ -53,16 +54,29 @@ export default function LinkedInQueueView({
     return entry;
   }
 
+  // On success, the contact immediately gets a due date and would vanish
+  // from this list the moment we refetch — but with the next contact
+  // instantly sliding into the same spot with an identically-labelled
+  // button, a click can look like it did nothing at all. Holding the
+  // just-added card in a visibly "done" state for a beat before removing it
+  // makes the click's effect unmistakable on the specific card you clicked.
   async function handleAdded(id: number, name: string) {
     setActionError(null);
     setBusyId(id);
     try {
       await apiMarkContacted(id);
+      setBusyId(null);
+      setConfirmedIds((prev) => new Set(prev).add(id));
       setToast({ id, name, action: "contacted" });
+      await new Promise((resolve) => setTimeout(resolve, 1400));
       await refresh();
+      setConfirmedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     } catch (e) {
       setActionError(`Couldn't add ${name}: ${(e as Error).message}`);
-    } finally {
       setBusyId(null);
     }
   }
@@ -86,6 +100,11 @@ export default function LinkedInQueueView({
     try {
       await apiUndoContact(id);
       setToast(null);
+      setConfirmedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       await refresh();
     } catch (e) {
       setActionError(`Couldn't undo: ${(e as Error).message}`);
@@ -202,6 +221,9 @@ export default function LinkedInQueueView({
               segmentLabel={c.segmentName}
               contactedLabel="Added on LinkedIn ✓"
               contactedBusy={busyId === c.id}
+              confirmed={confirmedIds.has(c.id)}
+              confirmedLabel="✓ Connected"
+              noDueLabel="Not connected yet"
             />
           ))}
         </div>
