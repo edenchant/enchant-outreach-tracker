@@ -543,7 +543,14 @@ export function getLinkedInAddsThisWeek(): number {
 export function getSuggestedLinkedInAdds(limit?: number): GridContact[] {
   const db = getDb();
   const now = new Date();
-  const rows = db.prepare(`${GLOBAL_CONTACT_SELECT} WHERE c.archived = 0 AND c.due_at IS NULL ORDER BY c.priority_score DESC`).all();
+  // stage_id IS NULL means outreach genuinely hasn't started for this
+  // contact yet. due_at IS NULL alone isn't enough: a contact who has
+  // completed their whole pipeline (reached a terminal stage) can also
+  // have a null due_at, and would otherwise keep resurfacing here as if
+  // they were never connected with.
+  const rows = db
+    .prepare(`${GLOBAL_CONTACT_SELECT} WHERE c.archived = 0 AND c.due_at IS NULL AND c.stage_id IS NULL ORDER BY c.priority_score DESC`)
+    .all();
   const brandMap = getBrandEventMap();
   const contacts: GridContact[] = rows.map((r: any) =>
     applyBrandBonus(
@@ -698,17 +705,21 @@ export function markContacted(id: number): Contact {
 
   const fromStage = current.stage_id ? (db.prepare("SELECT * FROM stages WHERE id = ?").get(current.stage_id) as any) : null;
   let nextStage: any = null;
-  if (fromStage && !fromStage.is_terminal) {
+  if (!fromStage) {
+    nextStage = db.prepare("SELECT * FROM stages WHERE segment_id = ? ORDER BY sort_order ASC LIMIT 1").get(current.segment_id);
+  } else if (!fromStage.is_terminal) {
     nextStage = db
       .prepare("SELECT * FROM stages WHERE segment_id = ? AND sort_order = ? ")
       .get(fromStage.segment_id, fromStage.sort_order + 1);
-  } else if (!fromStage) {
-    nextStage = db.prepare("SELECT * FROM stages WHERE segment_id = ? ORDER BY sort_order ASC LIMIT 1").get(current.segment_id);
   }
 
   const now = new Date();
+  // A terminal stage (or one with no configured successor) doesn't advance
+  // further, but re-confirming contact should still push the due date
+  // forward using that stage's own interval — clearing it to null would
+  // make a completed contact look like outreach never started.
   const toStage = nextStage ?? fromStage;
-  const newDueAt = nextStage ? new Date(now.getTime() + nextStage.interval_days * 24 * 60 * 60 * 1000).toISOString() : null;
+  const newDueAt = toStage ? new Date(now.getTime() + toStage.interval_days * 24 * 60 * 60 * 1000).toISOString() : null;
   const tierWeight = current.tier_id ? ((db.prepare("SELECT weight FROM tiers WHERE id = ?").get(current.tier_id) as any)?.weight ?? 0) : 0;
   const newPriority = computePriority(current.followers, tierWeight, toStage?.weight ?? 0, relationshipMultiplier(!!current.in_touch, !!current.converted));
 
