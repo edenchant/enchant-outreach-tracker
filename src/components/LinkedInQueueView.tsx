@@ -36,6 +36,8 @@ export default function LinkedInQueueView({
   const [draftingContact, setDraftingContact] = useState<Contact | null>(null);
   const [editing, setEditing] = useState<{ contact: GridContact; tiers: Tier[]; stages: Stage[] } | null>(null);
   const [configCache, setConfigCache] = useState<Record<string, { tiers: Tier[]; stages: Stage[] }>>({});
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   async function refresh() {
     const q = await fetchLinkedInQueue();
@@ -52,26 +54,51 @@ export default function LinkedInQueueView({
   }
 
   async function handleAdded(id: number, name: string) {
-    await apiMarkContacted(id);
-    setToast({ id, name, action: "contacted" });
-    await refresh();
+    setActionError(null);
+    setBusyId(id);
+    try {
+      await apiMarkContacted(id);
+      setToast({ id, name, action: "contacted" });
+      await refresh();
+    } catch (e) {
+      setActionError(`Couldn't add ${name}: ${(e as Error).message}`);
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function handleSnooze(id: number, name: string) {
-    await apiSnoozeContact(id);
-    setToast({ id, name, action: "snoozed" });
-    await refresh();
+    setActionError(null);
+    setBusyId(id);
+    try {
+      await apiSnoozeContact(id);
+      setToast({ id, name, action: "snoozed" });
+      await refresh();
+    } catch (e) {
+      setActionError(`Couldn't snooze ${name}: ${(e as Error).message}`);
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function handleUndo(id: number) {
-    await apiUndoContact(id);
-    setToast(null);
-    await refresh();
+    setActionError(null);
+    try {
+      await apiUndoContact(id);
+      setToast(null);
+      await refresh();
+    } catch (e) {
+      setActionError(`Couldn't undo: ${(e as Error).message}`);
+    }
   }
 
   async function handleUpdateFlags(id: number, patch: { inTouch?: boolean; converted?: boolean }) {
-    await apiUpdateContact(id, patch);
-    await refresh();
+    try {
+      await apiUpdateContact(id, patch);
+      await refresh();
+    } catch (e) {
+      setActionError(`Couldn't save: ${(e as Error).message}`);
+    }
   }
 
   async function handleEdit(contact: GridContact) {
@@ -109,6 +136,12 @@ export default function LinkedInQueueView({
         </div>
         <Waveform />
       </header>
+
+      {actionError && (
+        <div className="error-text" style={{ marginBottom: 14 }}>
+          {actionError}
+        </div>
+      )}
 
       {toast && (
         <div className="history-panel" style={{ marginBottom: 14 }}>
@@ -168,6 +201,7 @@ export default function LinkedInQueueView({
               onUpdateFlags={(patch) => handleUpdateFlags(c.id, patch)}
               segmentLabel={c.segmentName}
               contactedLabel="Added on LinkedIn ✓"
+              contactedBusy={busyId === c.id}
             />
           ))}
         </div>

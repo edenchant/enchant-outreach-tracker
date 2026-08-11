@@ -630,6 +630,11 @@ select {
   border-color: var(--line);
 }
 
+.actions button.contacted:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .empty {
   text-align: center;
   padding: 60px 20px;
