@@ -1,18 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Contact } from "@/lib/types";
 import { draftMessage } from "@/lib/api-client";
 
-export default function DraftModal({ contact, onClose }: { contact: Contact; onClose: () => void }) {
-  const [step, setStep] = useState<"context" | "result">("context");
+export default function DraftModal({
+  contact,
+  onClose,
+  defaultKind = "email",
+  skipContext = false,
+}: {
+  contact: Contact;
+  onClose: () => void;
+  defaultKind?: "email" | "linkedin";
+  skipContext?: boolean;
+}) {
+  const [step, setStep] = useState<"context" | "result">(skipContext ? "result" : "context");
   const [contextInput, setContextInput] = useState("");
-  const [kind, setKind] = useState<"email" | "linkedin">("email");
+  const [kind, setKind] = useState<"email" | "linkedin">(defaultKind);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [emailCopied, setEmailCopied] = useState(false);
+
+  useEffect(() => {
+    if (skipContext) generate(defaultKind, "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function generate(k: "email" | "linkedin", contextOverride?: string) {
     setLoading(true);

@@ -260,7 +260,9 @@ export default function LinkedInQueueView({
         />
       )}
 
-      {draftingContact && <DraftModal contact={draftingContact} onClose={() => setDraftingContact(null)} />}
+      {draftingContact && (
+        <DraftModal contact={draftingContact} onClose={() => setDraftingContact(null)} defaultKind="linkedin" skipContext />
+      )}
     </div>
   );
 }
