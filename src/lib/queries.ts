@@ -578,10 +578,24 @@ function mondayOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - diffToMonday));
 }
 
+function ordinal(n: number): string {
+  const rem100 = n % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
 function formatWeekLabel(monday: Date): string {
-  const sunday = new Date(monday.getTime() + 6 * 24 * 60 * 60 * 1000);
-  const fmt = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-  return `${fmt(monday)} – ${fmt(sunday)}, ${monday.getUTCFullYear()}`;
+  const month = monday.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
+  return `w/c ${ordinal(monday.getUTCDate())} ${month}`;
 }
 
 // Emails vs LinkedIn adds aren't tracked as separate channels on
