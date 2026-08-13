@@ -1,4 +1,4 @@
-import type { BrandHistoryEntry, Contact, GridContact, Segment, Stage, Tier } from "./types";
+import type { BrandEngagementRow, BrandHistoryEntry, Contact, GridContact, Segment, Stage, Tier } from "./types";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -61,6 +61,13 @@ export interface LinkedInQueueDTO {
 export async function fetchLinkedInQueue(): Promise<LinkedInQueueDTO> {
   const res = await fetch(`/api/linkedin-queue`);
   return json<LinkedInQueueDTO>(res);
+}
+
+export async function fetchBrandEngagement(segmentSlug?: string): Promise<{ top: BrandEngagementRow[]; bottom: BrandEngagementRow[] }> {
+  const params = new URLSearchParams();
+  if (segmentSlug) params.set("segment", segmentSlug);
+  const res = await fetch(`/api/reports/brand-engagement?${params.toString()}`);
+  return json<{ top: BrandEngagementRow[]; bottom: BrandEngagementRow[] }>(res);
 }
 
 export async function markContacted(id: number): Promise<Contact> {

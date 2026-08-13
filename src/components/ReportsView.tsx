@@ -1,7 +1,8 @@
 import Link from "next/link";
-import type { Segment, WeeklyReportRow } from "@/lib/types";
+import type { BrandEngagementRow, Segment, WeeklyReportRow } from "@/lib/types";
 import SegmentTabs from "./SegmentTabs";
 import Waveform from "./Waveform";
+import BrandEngagementChart from "./BrandEngagementChart";
 
 // A "very simple" heat map: how far each week sits from that column's own
 // average, bucketed into two steps per side so the shading reads at a
@@ -17,7 +18,17 @@ function heatClass(value: number, columnValues: number[]): string {
   return diff > 0 ? (strong ? "heat-pos-strong" : "heat-pos-light") : strong ? "heat-neg-strong" : "heat-neg-light";
 }
 
-export default function ReportsView({ segments, weeks }: { segments: Segment[]; weeks: WeeklyReportRow[] }) {
+export default function ReportsView({
+  segments,
+  weeks,
+  brandEngagement,
+  minContacts,
+}: {
+  segments: Segment[];
+  weeks: WeeklyReportRow[];
+  brandEngagement: { top: BrandEngagementRow[]; bottom: BrandEngagementRow[] };
+  minContacts: number;
+}) {
   const thisWeek = weeks[0];
   const totalEmails = weeks.reduce((sum, w) => sum + w.emails, 0);
   const totalLinkedinAdds = weeks.reduce((sum, w) => sum + w.linkedinAdds, 0);
@@ -105,6 +116,13 @@ export default function ReportsView({ segments, weeks }: { segments: Segment[]; 
         after the initial LinkedIn add happens by email. Shading compares each week to that column&apos;s own average
         across the {weeks.length} weeks shown.
       </div>
+
+      <BrandEngagementChart
+        segments={segments}
+        initialTop={brandEngagement.top}
+        initialBottom={brandEngagement.bottom}
+        minContacts={minContacts}
+      />
     </div>
   );
 }

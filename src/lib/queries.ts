@@ -2,7 +2,7 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { getDb } from "./db";
 import { brandBonusMultiplier, brandBonusSqlExpression, classify, computePriority, daysBetween, relationshipMultiplier } from "./priority";
-import type { BrandHistoryEntry, Contact, GridContact, OutreachEvent, Segment, Stage, Tier, WeeklyReportRow } from "./types";
+import type { BrandEngagementRow, BrandHistoryEntry, Contact, GridContact, OutreachEvent, Segment, Stage, Tier, WeeklyReportRow } from "./types";
 
 function toSegment(row: any): Segment {
   return { id: row.id, name: row.name, slug: row.slug, createdAt: row.created_at };
@@ -633,6 +633,42 @@ export function getWeeklyOutreachReport(weeks = 12): WeeklyReportRow[] {
     result.push({ weekStart: iso, weekLabel: formatWeekLabel(monday), emails, linkedinAdds, total: emails + linkedinAdds });
   }
   return result;
+}
+
+export const BRAND_ENGAGEMENT_MIN_CONTACTS = 5;
+
+// "Engaged" = in touch or converted. Brands below the minimum contact count
+// are excluded — with hundreds of brands having only one or two contacts,
+// they'd otherwise swamp the top/bottom lists with meaningless 100%/0% ties.
+export function getBrandEngagementReport(segmentSlug?: string): { top: BrandEngagementRow[]; bottom: BrandEngagementRow[] } {
+  const db = getDb();
+  const params: any[] = [];
+  let segmentClause = "";
+  if (segmentSlug) {
+    segmentClause = "AND seg.slug = ?";
+    params.push(segmentSlug);
+  }
+  params.push(BRAND_ENGAGEMENT_MIN_CONTACTS);
+
+  const rows = db
+    .prepare(
+      `SELECT c.brand as brand, COUNT(*) as total,
+              SUM(CASE WHEN c.in_touch = 1 OR c.converted = 1 THEN 1 ELSE 0 END) as engaged
+       FROM contacts c
+       JOIN segments seg ON seg.id = c.segment_id
+       WHERE c.archived = 0 AND c.brand IS NOT NULL AND TRIM(c.brand) != '' ${segmentClause}
+       GROUP BY c.brand
+       HAVING COUNT(*) >= ?`
+    )
+    .all(...params) as Array<{ brand: string; total: number; engaged: number }>;
+
+  const scored: BrandEngagementRow[] = rows
+    .map((r) => ({ brand: r.brand, total: r.total, engaged: r.engaged, rate: r.engaged / r.total }))
+    .sort((a, b) => b.rate - a.rate);
+
+  const top = scored.slice(0, 10);
+  const bottom = scored.slice(-10).reverse();
+  return { top, bottom };
 }
 
 export function getGlobalTopToday(limit = 10): GridContact[] {
