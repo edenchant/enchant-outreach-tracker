@@ -149,6 +149,9 @@ export default function LinkedInQueueView({
           <Link href="/brand-histories" className="btn">
             Brand histories
           </Link>
+          <Link href="/reports" className="btn">
+            Reports
+          </Link>
           <Link href="/" className="btn">
             ← Back to queue
           </Link>

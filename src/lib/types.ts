@@ -76,6 +76,14 @@ export interface GridContact extends Contact {
   segmentSlug: string;
 }
 
+export interface WeeklyReportRow {
+  weekStart: string;
+  weekLabel: string;
+  emails: number;
+  linkedinAdds: number;
+  total: number;
+}
+
 export interface OutreachEvent {
   id: number;
   contactId: number;

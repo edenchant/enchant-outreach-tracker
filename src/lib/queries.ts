@@ -2,7 +2,7 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { getDb } from "./db";
 import { brandBonusMultiplier, brandBonusSqlExpression, classify, computePriority, daysBetween, relationshipMultiplier } from "./priority";
-import type { BrandHistoryEntry, Contact, GridContact, OutreachEvent, Segment, Stage, Tier } from "./types";
+import type { BrandHistoryEntry, Contact, GridContact, OutreachEvent, Segment, Stage, Tier, WeeklyReportRow } from "./types";
 
 function toSegment(row: any): Segment {
   return { id: row.id, name: row.name, slug: row.slug, createdAt: row.created_at };
@@ -570,6 +570,55 @@ export function getSuggestedLinkedInAdds(limit?: number): GridContact[] {
   );
   contacts.sort((a, b) => b.effectivePriorityScore - a.effectivePriorityScore);
   return typeof limit === "number" ? contacts.slice(0, limit) : contacts;
+}
+
+function mondayOf(date: Date): Date {
+  const day = date.getUTCDay();
+  const diffToMonday = day === 0 ? 6 : day - 1;
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - diffToMonday));
+}
+
+function formatWeekLabel(monday: Date): string {
+  const sunday = new Date(monday.getTime() + 6 * 24 * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  return `${fmt(monday)} – ${fmt(sunday)}, ${monday.getUTCFullYear()}`;
+}
+
+// Emails vs LinkedIn adds aren't tracked as separate channels on
+// outreach_events — the same prev_due_at IS NULL signal used for the
+// LinkedIn queue's weekly counter marks a contact's very first outreach
+// touch (always a LinkedIn add); every other 'contacted' event is counted
+// as an email, since that's what the rest of the pipeline's stage advances
+// represent in practice.
+export function getWeeklyOutreachReport(weeks = 12): WeeklyReportRow[] {
+  const db = getDb();
+  const thisMonday = mondayOf(new Date());
+  const earliestMonday = new Date(thisMonday.getTime() - (weeks - 1) * 7 * 24 * 60 * 60 * 1000);
+  const earliestISO = earliestMonday.toISOString().slice(0, 10);
+
+  const rows = db
+    .prepare(
+      `SELECT
+         date(contacted_at, '-' || ((CAST(strftime('%w', contacted_at) AS INTEGER) + 6) % 7) || ' days') AS week_start,
+         SUM(CASE WHEN prev_due_at IS NULL THEN 1 ELSE 0 END) AS linkedin_adds,
+         SUM(CASE WHEN prev_due_at IS NOT NULL THEN 1 ELSE 0 END) AS emails
+       FROM outreach_events
+       WHERE type = 'contacted' AND date(contacted_at) >= date(?)
+       GROUP BY week_start`
+    )
+    .all(earliestISO) as Array<{ week_start: string; linkedin_adds: number; emails: number }>;
+  const byWeek = new Map(rows.map((r) => [r.week_start, r]));
+
+  const result: WeeklyReportRow[] = [];
+  for (let i = 0; i < weeks; i++) {
+    const monday = new Date(thisMonday.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+    const iso = monday.toISOString().slice(0, 10);
+    const match = byWeek.get(iso);
+    const emails = match?.emails ?? 0;
+    const linkedinAdds = match?.linkedin_adds ?? 0;
+    result.push({ weekStart: iso, weekLabel: formatWeekLabel(monday), emails, linkedinAdds, total: emails + linkedinAdds });
+  }
+  return result;
 }
 
 export function getGlobalTopToday(limit = 10): GridContact[] {

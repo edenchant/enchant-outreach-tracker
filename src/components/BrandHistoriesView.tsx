@@ -201,6 +201,12 @@ export default function BrandHistoriesView({
           <a href={SALES_NAV_URL} target="_blank" rel="noreferrer" className="btn">
             Open Sales Navigator ↗
           </a>
+          <Link href="/linkedin-queue" className="btn">
+            LinkedIn queue
+          </Link>
+          <Link href="/reports" className="btn">
+            Reports
+          </Link>
           <Link href="/" className="btn">
             ← Back to queue
           </Link>
