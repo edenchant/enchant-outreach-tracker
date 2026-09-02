@@ -125,6 +125,9 @@ export default function GlobalHome({
           <Link href="/reports" className="btn">
             Reports
           </Link>
+          <Link href="/data-tools" className="btn">
+            Data tools
+          </Link>
           <div className="today-date" suppressHydrationWarning>
             {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </div>

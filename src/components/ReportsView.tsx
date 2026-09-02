@@ -52,6 +52,9 @@ export default function ReportsView({
           <Link href="/brand-histories" className="btn">
             Brand histories
           </Link>
+          <Link href="/data-tools" className="btn">
+            Data tools
+          </Link>
           <Link href="/" className="btn">
             ← Back to queue
           </Link>

@@ -1274,3 +1274,159 @@ thead .sticky-col {
   font-family: var(--mono);
   color: var(--ink-soft);
 }
+
+.data-tools-section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+
+.data-tools-section h2 {
+  margin: 0 0 4px;
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.data-tools-section .top-ten-sub {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.data-tools-section input[type="file"] {
+  font-size: 13px;
+}
+
+.data-tools-preview {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.data-tools-summary {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.data-tools-count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+}
+
+.data-tools-count.pos {
+  color: var(--signal);
+  border-color: var(--signal);
+  background: #dcf5e3;
+}
+
+.data-tools-count.neutral {
+  color: var(--ink-soft);
+}
+
+.data-tools-count.neg {
+  color: var(--overdue);
+  border-color: var(--overdue);
+  background: #fde2e1;
+}
+
+.data-tools-preview details {
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.data-tools-preview summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.data-tools-row-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  font-size: 12.5px;
+}
+
+.data-tools-row-list li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.data-tools-row-list li:last-child {
+  border-bottom: none;
+}
+
+.data-tools-error-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.data-tools-error-list li {
+  padding: 2px 0;
+}
+
+.data-tools-warning {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fde2e1;
+  border: 1px solid var(--overdue);
+  color: var(--overdue);
+  font-size: 12.5px;
+}
+
+.data-tools-warning b {
+  color: var(--ink);
+}
+
+.data-tools-scope-line {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+
+.data-tools-apply {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.data-tools-confirm-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--overdue);
+  font-weight: 600;
+}
+
+.data-tools-confirm-label code {
+  font-family: var(--mono);
+}
+
+.data-tools-confirm-input {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--overdue);
+  font-family: var(--mono);
+  font-size: 13px;
+  width: 120px;
+}

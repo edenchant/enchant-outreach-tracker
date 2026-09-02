@@ -207,6 +207,9 @@ export default function BrandHistoriesView({
           <Link href="/reports" className="btn">
             Reports
           </Link>
+          <Link href="/data-tools" className="btn">
+            Data tools
+          </Link>
           <Link href="/" className="btn">
             ← Back to queue
           </Link>

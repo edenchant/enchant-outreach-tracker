@@ -1,4 +1,5 @@
 import type { BrandEngagementRow, BrandHistoryEntry, Contact, GridContact, Segment, Stage, Tier } from "./types";
+import type { ImportDiff } from "./import-export";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -68,6 +69,24 @@ export async function fetchBrandEngagement(segmentSlug?: string): Promise<{ top:
   if (segmentSlug) params.set("segment", segmentSlug);
   const res = await fetch(`/api/reports/brand-engagement?${params.toString()}`);
   return json<{ top: BrandEngagementRow[]; bottom: BrandEngagementRow[] }>(res);
+}
+
+export async function previewImport(scope: string | null, csv: string): Promise<ImportDiff> {
+  const res = await fetch(`/api/import/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope, csv }),
+  });
+  return json<ImportDiff>(res);
+}
+
+export async function applyImport(scope: string | null, csv: string): Promise<ImportDiff> {
+  const res = await fetch(`/api/import/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope, csv }),
+  });
+  return json<ImportDiff>(res);
 }
 
 export async function markContacted(id: number): Promise<Contact> {
