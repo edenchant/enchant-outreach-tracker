@@ -557,6 +557,7 @@ export function getSuggestedLinkedInAdds(limit?: number): GridContact[] {
     )
     .all();
   const brandMap = getBrandEventMap();
+  const contactedBrands = brandsContactedToday();
   const contacts: GridContact[] = rows.map((r: any) =>
     applyBrandBonus(
       {
@@ -569,7 +570,13 @@ export function getSuggestedLinkedInAdds(limit?: number): GridContact[] {
     )
   );
   contacts.sort((a, b) => b.effectivePriorityScore - a.effectivePriorityScore);
-  return typeof limit === "number" ? contacts.slice(0, limit) : contacts;
+  // One person per company at a time: the highest-priority contact from
+  // each brand, and once someone at a brand has been added today, no one
+  // else from that brand is suggested until tomorrow — same rule as the
+  // Today's Top 10 list, via the same brandsContactedToday/dedupeByBrand
+  // helpers, so "added on LinkedIn" counts as "contacted" here too.
+  const deduped = dedupeByBrand(contacts.filter((c) => !c.brand || !contactedBrands.has(c.brand)));
+  return typeof limit === "number" ? deduped.slice(0, limit) : deduped;
 }
 
 function mondayOf(date: Date): Date {

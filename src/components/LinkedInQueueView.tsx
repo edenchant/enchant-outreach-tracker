@@ -244,9 +244,10 @@ export default function LinkedInQueueView({
       <div className="footnote">
         LinkedIn caps outgoing connection requests at {weeklyLimit} a week, resetting Monday. This list shows the
         highest-priority contacts who don&apos;t have a due date yet — meaning the outreach process hasn&apos;t started
-        for them — capped to whatever&apos;s left of this week&apos;s allowance. Click &quot;Added on LinkedIn&quot; once
-        you&apos;ve sent the request; that gives them a due date and moves them into the regular queue. Snoozing instead
-        defers them 30 days without using up any of the allowance.
+        for them — capped to whatever&apos;s left of this week&apos;s allowance, one contact per company at a time:
+        once someone at a company has been added today, no one else from there shows up here until tomorrow. Click
+        &quot;Added on LinkedIn&quot; once you&apos;ve sent the request; that gives them a due date and moves them
+        into the regular queue. Snoozing instead defers them 30 days without using up any of the allowance.
       </div>
 
       {editing && (
