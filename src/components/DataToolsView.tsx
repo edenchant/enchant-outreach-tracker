@@ -8,6 +8,7 @@ import { detectScopeFromCsv, type DetectedScope } from "@/lib/csv-scope";
 import { applyImport, previewImport } from "@/lib/api-client";
 import SegmentTabs from "./SegmentTabs";
 import Waveform from "./Waveform";
+import SegmentMergeTool from "./SegmentMergeTool";
 
 const FIELD_LABELS: Record<string, string> = {
   tier: "Tier",
@@ -33,7 +34,8 @@ const FIELD_LABELS: Record<string, string> = {
 // need it.
 const TYPED_CONFIRM_THRESHOLD = 5;
 
-export default function DataToolsView({ segments }: { segments: Segment[] }) {
+export default function DataToolsView({ segments: initialSegments }: { segments: Segment[] }) {
+  const [segments, setSegments] = useState(initialSegments);
   const [exportScope, setExportScope] = useState("");
   const [importScope, setImportScope] = useState("");
   const [detectedScope, setDetectedScope] = useState<DetectedScope | null>(null);
@@ -101,6 +103,12 @@ export default function DataToolsView({ segments }: { segments: Segment[] }) {
     } finally {
       setApplying(false);
     }
+  }
+
+  function handleMerged(deletedSlug: string) {
+    setSegments((prev) => prev.filter((s) => s.slug !== deletedSlug));
+    if (exportScope === deletedSlug) setExportScope("");
+    if (importScope === deletedSlug) setImportScope("");
   }
 
   const hasErrors = !!diff && diff.errors.length > 0;
@@ -308,6 +316,8 @@ export default function DataToolsView({ segments }: { segments: Segment[] }) {
           </div>
         )}
       </div>
+
+      <SegmentMergeTool segments={segments} onMerged={handleMerged} />
     </div>
   );
 }

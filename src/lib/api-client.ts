@@ -1,4 +1,4 @@
-import type { BrandEngagementRow, BrandHistoryEntry, Contact, GridContact, Segment, Stage, Tier } from "./types";
+import type { BrandEngagementRow, BrandHistoryEntry, Contact, GridContact, Segment, SegmentMergePreview, Stage, Tier } from "./types";
 import type { ImportDiff } from "./import-export";
 
 async function json<T>(res: Response): Promise<T> {
@@ -87,6 +87,24 @@ export async function applyImport(scope: string | null, csv: string): Promise<Im
     body: JSON.stringify({ scope, csv }),
   });
   return json<ImportDiff>(res);
+}
+
+export async function previewSegmentMerge(from: string, to: string): Promise<SegmentMergePreview> {
+  const res = await fetch(`/api/segments/merge/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to }),
+  });
+  return json<SegmentMergePreview>(res);
+}
+
+export async function applySegmentMerge(from: string, to: string): Promise<{ movedContacts: number; deletedSegment: string }> {
+  const res = await fetch(`/api/segments/merge/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to }),
+  });
+  return json<{ movedContacts: number; deletedSegment: string }>(res);
 }
 
 export async function markContacted(id: number): Promise<Contact> {

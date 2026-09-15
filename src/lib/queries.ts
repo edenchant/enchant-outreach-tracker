@@ -2,7 +2,19 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { getDb } from "./db";
 import { brandBonusMultiplier, brandBonusSqlExpression, classify, computePriority, daysBetween, relationshipMultiplier } from "./priority";
-import type { BrandEngagementRow, BrandHistoryEntry, Contact, GridContact, OutreachEvent, Segment, Stage, Tier, WeeklyReportRow } from "./types";
+import type {
+  BrandEngagementRow,
+  BrandHistoryEntry,
+  Contact,
+  GridContact,
+  OutreachEvent,
+  Segment,
+  SegmentMergePreview,
+  SegmentMergeStageWarning,
+  Stage,
+  Tier,
+  WeeklyReportRow,
+} from "./types";
 
 function toSegment(row: any): Segment {
   return { id: row.id, name: row.name, slug: row.slug, createdAt: row.created_at };
@@ -226,6 +238,87 @@ function recomputeContactsForStage(stageId: number) {
     const priority = computePriority(c.followers, tierWeight, stageWeight, relationshipMultiplier(c.inTouch, c.converted));
     db.prepare("UPDATE contacts SET priority_score = ? WHERE id = ?").run(priority, c.id);
   }
+}
+
+// Tiers are always S/A/B/C/D in every segment (createSegment always seeds
+// DEFAULT_TIERS, and the letter itself is never editable — only label and
+// weight are) so matching by letter across segments is always complete.
+function buildTierLetterMap(fromTiers: Tier[], toTiers: Tier[]): Map<number, number | null> {
+  const toByLetter = new Map(toTiers.map((t) => [t.letter, t.id]));
+  const map = new Map<number, number | null>();
+  for (const t of fromTiers) map.set(t.id, toByLetter.get(t.letter) ?? null);
+  return map;
+}
+
+// Stage names, unlike tier letters, are editable per segment (updateStage),
+// so a name match isn't guaranteed — any contact on a from-segment stage
+// with no matching name in the to-segment ends up with stage_id null
+// rather than a guessed mapping (e.g. by position), which could quietly
+// land it on a stage with different meaning/interval/weight.
+function buildStageNameMap(fromStages: Stage[], toStages: Stage[]): Map<number, number | null> {
+  const toByName = new Map(toStages.map((s) => [s.name.trim().toLowerCase(), s.id]));
+  const map = new Map<number, number | null>();
+  for (const s of fromStages) map.set(s.id, toByName.get(s.name.trim().toLowerCase()) ?? null);
+  return map;
+}
+
+export function previewSegmentMerge(fromSlug: string, toSlug: string): SegmentMergePreview {
+  const from = getSegmentBySlug(fromSlug);
+  const to = getSegmentBySlug(toSlug);
+  if (!from) throw new Error(`Segment "${fromSlug}" not found`);
+  if (!to) throw new Error(`Segment "${toSlug}" not found`);
+  if (from.id === to.id) throw new Error("Source and destination segments must be different");
+
+  const db = getDb();
+  const contactCount = (db.prepare("SELECT COUNT(*) as n FROM contacts WHERE segment_id = ?").get(from.id) as any).n;
+
+  const fromStages = getStages(from.id);
+  const stageMap = buildStageNameMap(fromStages, getStages(to.id));
+  const unmatchedStages: SegmentMergeStageWarning[] = [];
+  for (const s of fromStages) {
+    if (stageMap.get(s.id) !== null) continue;
+    const row = db.prepare("SELECT COUNT(*) as n FROM contacts WHERE segment_id = ? AND stage_id = ?").get(from.id, s.id) as any;
+    if (row.n > 0) unmatchedStages.push({ stageName: s.name, contactCount: row.n });
+  }
+
+  return { fromSlug: from.slug, fromName: from.name, toSlug: to.slug, toName: to.name, contactCount, unmatchedStages };
+}
+
+// Moves every contact out of `from` into `to` (remapping tier/stage and
+// recomputing priority_score), then deletes `from` — its now-empty
+// tiers/stages cascade-delete with it. All in one transaction.
+export function applySegmentMerge(fromSlug: string, toSlug: string): { movedContacts: number; deletedSegment: string } {
+  const from = getSegmentBySlug(fromSlug);
+  const to = getSegmentBySlug(toSlug);
+  if (!from) throw new Error(`Segment "${fromSlug}" not found`);
+  if (!to) throw new Error(`Segment "${toSlug}" not found`);
+  if (from.id === to.id) throw new Error("Source and destination segments must be different");
+
+  const db = getDb();
+  const tierMap = buildTierLetterMap(getTiers(from.id), getTiers(to.id));
+  const stageMap = buildStageNameMap(getStages(from.id), getStages(to.id));
+  const contacts = db.prepare("SELECT * FROM contacts WHERE segment_id = ?").all(from.id) as any[];
+
+  db.exec("BEGIN");
+  try {
+    for (const c of contacts) {
+      const newTierId = c.tier_id ? (tierMap.get(c.tier_id) ?? null) : null;
+      const newStageId = c.stage_id ? (stageMap.get(c.stage_id) ?? null) : null;
+      const tierWeight = newTierId ? ((db.prepare("SELECT weight FROM tiers WHERE id = ?").get(newTierId) as any)?.weight ?? 0) : 0;
+      const stageWeight = newStageId ? ((db.prepare("SELECT weight FROM stages WHERE id = ?").get(newStageId) as any)?.weight ?? 0) : 0;
+      const priority = computePriority(c.followers, tierWeight, stageWeight, relationshipMultiplier(!!c.in_touch, !!c.converted));
+      db.prepare(
+        "UPDATE contacts SET segment_id = ?, tier_id = ?, stage_id = ?, priority_score = ?, updated_at = datetime('now') WHERE id = ?"
+      ).run(to.id, newTierId, newStageId, priority, c.id);
+    }
+    deleteSegment(from.id);
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+
+  return { movedContacts: contacts.length, deletedSegment: from.name };
 }
 
 export interface ContactFilters {

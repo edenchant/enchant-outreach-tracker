@@ -83,6 +83,20 @@ export interface BrandEngagementRow {
   rate: number;
 }
 
+export interface SegmentMergeStageWarning {
+  stageName: string;
+  contactCount: number;
+}
+
+export interface SegmentMergePreview {
+  fromSlug: string;
+  fromName: string;
+  toSlug: string;
+  toName: string;
+  contactCount: number;
+  unmatchedStages: SegmentMergeStageWarning[];
+}
+
 export interface WeeklyReportRow {
   weekStart: string;
   weekLabel: string;
